@@ -8,7 +8,7 @@ width = 9
 length = 2.43
 
 # ! 修改矩阵参数（长、宽），修改格子实际宽度，修改文件路径
-def calibrate(folder="/home/orangepi/Robogame/opencv/img/*.png", save="calib.npz"):
+def calibrate(folder="/home/orangepi/Robogame/opencv/calib/img/*.png", save="calib.npz"):
     images = glob.glob(folder)
     if not images:
         raise FileNotFoundError("没有找到标定图，请检查路径或后缀")

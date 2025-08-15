@@ -2,7 +2,7 @@ import cv2
 import os
 
 # 创建保存目录
-save_dir = "/home/orangepi/Robogame/opencv/img"
+save_dir = "/home/orangepi/Robogame/opencv/calib/img"
 os.makedirs(save_dir, exist_ok=True)
 
 camera = cv2.VideoCapture(0)

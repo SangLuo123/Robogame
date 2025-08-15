@@ -4,7 +4,7 @@ from pupil_apriltags import Detector
 from package import load_calib
 
 # ===== 1) 相机参数（替换为你的标定结果）=====
-npz_path = "mtx_dist/calib.npz"  # 替换为你的标定文件路径
+npz_path = "../calib/calib.npz"  # 替换为你的标定文件路径
 mtx, dist = load_calib(npz_path)
 
 fx, fy, cx, cy = float(mtx[0,0]), float(mtx[1,1]), float(mtx[0,2]), float(mtx[1,2])
