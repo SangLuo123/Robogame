@@ -5,7 +5,7 @@ import math
 
 height = 6 
 width = 9
-length = 2.43
+length = 24.3
 
 # ! 修改矩阵参数（长、宽），修改格子实际宽度，修改文件路径
 def calibrate(folder="/home/orangepi/Robogame/opencv/calib/img/*.png", save="calib.npz"):

@@ -41,23 +41,24 @@ class RobotCar:
     # 有待更新
     def compute_control_to_target(self, target_x, target_y, kv=0.5, ktheta=1.0):
         """
-        根据当前位姿计算去目标点的简单控制指令 (v, omega)
+        根据当前位姿计算去目标点的简单控制指令 (vx, vy, omega)
         target_x, target_y: 目标点世界坐标（米）
         kv, ktheta: PID比例系数
         """
-        dx = target_x - self.x
-        dy = target_y - self.y
+        # TODO: 更新为全向控制
+        # dx = target_x - self.x
+        # dy = target_y - self.y
 
-        # 目标方向角（世界系）
-        target_yaw = np.degrees(np.arctan2(dy, dx))
-        # 航向误差
-        yaw_err = (target_yaw - self.yaw + 180) % 360 - 180
-        # 距离误差
-        dist_err = np.hypot(dx, dy)
+        # # 目标方向角（世界系）
+        # target_yaw = np.degrees(np.arctan2(dy, dx))
+        # # 航向误差
+        # yaw_err = (target_yaw - self.yaw + 180) % 360 - 180
+        # # 距离误差
+        # dist_err = np.hypot(dx, dy)
 
-        v = kv * dist_err  # 简单比例控制
-        omega = np.radians(ktheta * yaw_err)  # 转成弧度/秒
-        return v, omega
+        # v = kv * dist_err  # 简单比例控制
+        # omega = np.radians(ktheta * yaw_err)  # 转成弧度/秒
+        # return v, omega
 
     def __repr__(self):
         return f"RobotCar(x={self.x:.3f}, y={self.y:.3f}, yaw={self.yaw:.1f}°)"

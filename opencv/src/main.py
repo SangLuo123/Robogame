@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import json
+import math
 import numpy as np
 import cv2
 
@@ -16,6 +17,42 @@ from src.detector import Detector
 from src.comm import SerialLink
 from package.load_calib import load_calib  # 你已有
 from src.transform import rt_to_T
+
+
+def _normalize(v):
+    v = np.asarray(v, float)
+    n = np.linalg.norm(v)
+    return v / n if n > 1e-12 else v
+
+def tag_T_from_world_corners(tl, tr, br, bl):
+    """
+    输入四个角点在世界坐标系下的 3D 坐标（单位 m），顺序：tl, tr, br, bl
+    Tag 局部系约定:
+      - 原点: Tag 中心
+      - x 轴: tl->tr（上边向右）
+      - y 轴: tl->bl（左边向下）
+      - z 轴: x × y（右手系，指向相机/法线）
+    返回 世界<-Tag 的 4x4 齐次矩阵
+    """
+    tl = np.asarray(tl, float)
+    tr = np.asarray(tr, float)
+    br = np.asarray(br, float)
+    bl = np.asarray(bl, float)
+
+    center = 0.25 * (tl + tr + br + bl)
+
+    x_w = _normalize(tr - tl)
+    y0  = _normalize(bl - tl)
+    # 正交化 y，防止量测误差导致不垂直
+    y_w = _normalize(y0 - np.dot(y0, x_w) * x_w)
+    z_w = _normalize(np.cross(x_w, y_w))  # 右手系
+
+    R_wt = np.column_stack((x_w, y_w, z_w))  # world <- tag
+    T_wt = np.eye(4, dtype=float)
+    T_wt[:3, :3] = R_wt
+    T_wt[:3, 3]  = center
+    return T_wt
+
 # ========== 配置 & 初始化相关 ==========
 
 def load_config(path="data/config.json"):
@@ -31,17 +68,32 @@ def load_config(path="data/config.json"):
         "serial_port": "/dev/ttyUSB0",      # 用 udev 固定后的名字；没有就 /dev/ttyACM0
         "baud": 115200,
         "camera_index": 0,                # /dev/video0
-        "tag_size": 0.16,                 # 米，内黑框边长
+        "tag_size": 120,                 # 米，内黑框边长
         "hsv_range": {"lower": [0,120,100], "upper": [10,255,255]},
         # 机器人←相机 外参（示例：正前且抬高 0.25m）
         "T_robot_cam": {
             "R": [[1,0,0],[0,1,0],[0,0,1]],
             "t": [0.0, 0.0, 0.25]
         },
-        # tag 地图：世界←tag（示例 2 个）
+        # # tag 地图：世界←tag（示例 2 个）
+        # "tag_map": {
+        #     "0": { "R": [[1,0,0],[0,1,0],[0,0,1]], "t": [0.0, 0.0, 0.0] },
+        #     "1": { "R": rotz_deg(90).tolist(),     "t": [2.0, 0.0, 0.0] }
+        # },
+        # ---- 这里改为四角坐标 ----
         "tag_map": {
-            "0": { "R": [[1,0,0],[0,1,0],[0,0,1]], "t": [0.0, 0.0, 0.0] },
-            "1": { "R": rotz_deg(90).tolist(),     "t": [2.0, 0.0, 0.0] }
+            "0": {  # id=0 这张码四角在世界系下的 3D 坐标（示例：贴墙，z 为高度）
+                "tl": [0.00, 0.80, 0.80],
+                "tr": [0.16, 0.80, 0.80],
+                "br": [0.16, 0.96, 0.80],
+                "bl": [0.00, 0.96, 0.80]
+            },
+            "1": {
+                "tl": [2.00, 0.80, 0.80],
+                "tr": [2.16, 0.80, 0.80],
+                "br": [2.16, 0.96, 0.80],
+                "bl": [2.00, 0.96, 0.80]
+            }
         },
         "goal": [1.5, 0.5],               # 目标点
         "reach_tol_m": 0.10,              # 到点阈值
@@ -63,7 +115,7 @@ def build_tag_map(cfg):
     tag_map = {}
     for k, v in cfg["tag_map"].items():
         tag_id = int(k)
-        T = rt_to_T(v["R"], v["t"])
+        T = tag_T_from_world_corners(v["tl"], v["tr"], v["br"], v["bl"])
         tag_map[tag_id] = T
     return tag_map
 
@@ -170,14 +222,15 @@ def main():
 
             elif state == State.NAVIGATE:
                 # 去目标点
-                v, w = car.compute_control_to_target(goal[0], goal[1], kv=kv, ktheta=ktheta)
+                vx, vy, w = car.compute_control_to_target(goal[0], goal[1], kv=kv, ktheta=ktheta)
                 # 简单限幅（可移到 comm 里）
-                v = float(max(-0.6, min(0.6, v)))
+                vx = float(max(-0.6, min(0.6, vx)))
+                vy = float(max(-0.6, min(0.6, vy)))
                 w = float(max(-2.5, min(2.5, w)))
-                link.send_vel(v, w)
+                link.send_vel_xyw(vx, vy, w)
 
                 if reached_goal(car, goal, cfg["reach_tol_m"]):
-                    link.send_vel(0.0, 0.0)
+                    link.send_vel_xyw(0.0, 0.0, 0.0)
                     state = State.GRAB
             
             elif state == State.GRAB:
@@ -188,7 +241,7 @@ def main():
                 state = State.DONE
 
             elif state == State.DONE:
-                link.send_vel(0.0, 0.0)
+                link.send_vel_xyw(0.0, 0.0, 0.0)  # 停止移动
                 # 这里可以进入下一任务或者直接停
                 pass
 
@@ -210,7 +263,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        link.send_vel(0.0, 0.0)
+        link.send_vel_xyw(0.0, 0.0, 0.0)  # 停止移动
         link.close()
         cap.release()
         cv2.destroyAllWindows()

@@ -41,7 +41,8 @@ def main():
         undistorted = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR)
 
         # 仅用于展示：缩放拼接对比图
-        disp_w, disp_h = 640, int(640 * h / w)
+        disp_w = 480
+        disp_h = int(disp_w * h / w)
         left  = cv2.resize(frame, (disp_w, disp_h))
         right = cv2.resize(undistorted, (disp_w, disp_h))
         combined = np.hstack((left, right))

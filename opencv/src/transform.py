@@ -6,11 +6,17 @@ import cv2
 注意乘的矩阵是谁相对谁，是否求逆
 """
 
-def rt_to_T(R: np.ndarray, t: np.ndarray) -> np.ndarray:
-    """R(3x3), t(3,) or (3,1) -> 4x4齐次变换"""
+def rt_to_T(R, t):
+    """
+    R: 3x3 (list/tuple/ndarray)
+    t: 3   (list/tuple/ndarray)
+    return: 4x4 ndarray
+    """
+    R = np.asarray(R, dtype=float).reshape(3, 3)
+    t = np.asarray(t, dtype=float).reshape(3)
     T = np.eye(4, dtype=float)
-    T[:3,:3] = R
-    T[:3, 3] = t.reshape(3)
+    T[:3, :3] = R
+    T[:3, 3]  = t
     return T
 
 def T_inv(T: np.ndarray) -> np.ndarray:

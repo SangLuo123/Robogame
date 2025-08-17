@@ -30,8 +30,8 @@ class AsciiProtocol:
         return b"$" + payload.encode("ascii") + b"#"
 
     @staticmethod
-    def build_vel(v_m_s: float, w_rad_s: float) -> bytes:
-        return AsciiProtocol.build("V", [f"{v_m_s:.3f}", f"{w_rad_s:.3f}"])
+    def build_vel_xyw(vx: float, vy: float, w: float) -> bytes:
+        return AsciiProtocol.build("V", [f"{vx:.3f}", f"{vy:.3f}", f"{w:.3f}"])
 
     @staticmethod
     def build_stop() -> bytes:
@@ -112,7 +112,8 @@ class SerialLink:
 
         self.proto = AsciiProtocol()
         self.last_tx_time: float = 0.0              # 最近一次发送任意帧的时间
-        self._last_cmd: Tuple[float, float] = (0.0, 0.0)  # 最近一次速度(v,w)，供心跳"last"模式用
+        self._last_cmd_xyw: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+
 
         # 回调（按需绑定）
         self.on_frame: SerialLink.FrameCB = None
@@ -147,10 +148,10 @@ class SerialLink:
         self.ser.write(b)
         self.last_tx_time = time.time()
 
-    def send_vel(self, v_m_s: float, w_rad_s: float):
-        """速度控制：$Vv,w#"""
-        self._last_cmd = (float(v_m_s), float(w_rad_s))
-        self._send_bytes(self.proto.build_vel(v_m_s, w_rad_s))
+    def send_vel_xyw(self, vx: float, vy: float, w: float):
+        """ 全向速度命令：$Vvx,vy,w# """
+        self._last_cmd_xyw = (float(vx), float(vy), float(w))
+        self._send_bytes(self.proto.build_vel_xyw(vx, vy, w))
 
     def send_stop(self):
         """急停：$S#"""
@@ -229,8 +230,8 @@ class SerialLink:
         """
         now = time.time()
         if now - self.last_tx_time > interval_s:
-            if mode == "last":
-                v, w = self._last_cmd
+            if mode == "zero":
+                vx, vy, w = 0.0, 0.0, 0.0
             else:
-                v, w = 0.0, 0.0
-            self.send_vel(v, w)
+                vx, vy, w = self._last_cmd_xyw
+            self.send_vel_xyw(vx, vy, w)

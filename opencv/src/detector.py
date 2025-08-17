@@ -22,9 +22,9 @@ class Detector:
         # 初始化 AprilTag 检测器
         self.tag_detector = AprilTagDetector(
             families=tag_families,
-            nthreads=2,
-            quad_decimate=1.5,
-            refine_edges=True
+            nthreads=2, # 多线程加速
+            quad_decimate=1.5, # 图像金字塔下采样倍数。>1 表示先把图缩小再做边缘/四边形搜索。
+            refine_edges=True # 是否对检测到的四边形角点做亚像素级边缘细化。开启（True）通常能提高角点定位精度 → 位姿估计更准，但会略微变慢。
         )
 
     def detect_tags(self, frame, estimate_pose=True):
@@ -39,7 +39,7 @@ class Detector:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         results = self.tag_detector.detect(
             gray,
-            estimate_tag_pose=estimate_pose,
+            estimate_tag_pose=estimate_pose, # 是否直接在检测阶段估计位姿。
             camera_params=(self.fx, self.fy, self.cx, self.cy),
             tag_size=self.tag_size
         )
@@ -47,10 +47,10 @@ class Detector:
         detections = []
         for r in results:
             det = {
-                "tag_id": r.tag_id,
-                "pose_R": r.pose_R,
-                "pose_t": r.pose_t,
-                "corners": r.corners
+                "tag_id": r.tag_id, # 标签 ID
+                "pose_R": r.pose_R, # 相机坐标系下tag的旋转矩阵
+                "pose_t": r.pose_t, # 相机坐标系下tag的平移向量
+                "corners": r.corners # tag 在图像坐标系下的 四个角点坐标 (4×2 像素点)。
             }
             detections.append(det)
         return detections
@@ -79,9 +79,9 @@ class Detector:
         if not contours:
             return None, None
         cnt = max(contours, key=cv2.contourArea)
-        if cv2.contourArea(cnt) < 100:  # 太小
+        if cv2.contourArea(cnt) < 100:  # 太小 # TODO: 100是面积，得调整
             return None, None
-        M = cv2.moments(cnt)
+        M = cv2.moments(cnt) # 计算矩
         if M["m00"] == 0:
             return None, None
         cx = int(M["m10"]/M["m00"])
