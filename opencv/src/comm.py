@@ -2,6 +2,7 @@
 import serial
 import threading
 import time
+import math
 from typing import List, Tuple, Callable, Optional
 
 # ========== 协议常量 ==========
@@ -12,7 +13,7 @@ FRAME_TAIL = ord('#')
 class AsciiProtocol:
     """
     ASCII 帧协议: $<CMD><payload>#
-      V: $V<v_m_s>,<w_rad_s>#
+      V: $V<x_mm>,<y_mm>#          (坐标，单位 mm，表示目标相对小车坐标系的位置)
       S: $S#
       Q: $Q#
       E: $E<e1>,<e2>,...#          (下位机回复)
@@ -20,6 +21,7 @@ class AsciiProtocol:
       P: $P<rpm>#
       T: $T#                        (触发发射)
       C: $C<name>#                  (机械臂预设动作)
+      R: $R<yaw_deg>#               (旋转角度)
     """
 
     # ---- 组包 ----
@@ -30,8 +32,8 @@ class AsciiProtocol:
         return b"$" + payload.encode("ascii") + b"#"
 
     @staticmethod
-    def build_vel_xyw(vx: float, vy: float, w: float) -> bytes:
-        return AsciiProtocol.build("V", [f"{vx:.3f}", f"{vy:.3f}", f"{w:.3f}"])
+    def build_vel_xy(x: float, y: float) -> bytes:
+        return AsciiProtocol.build("V", [f"{x:.3f}", f"{y:.3f}"])
 
     @staticmethod
     def build_stop() -> bytes:
@@ -52,6 +54,10 @@ class AsciiProtocol:
     @staticmethod
     def build_arm_preset(name: str) -> bytes:
         return AsciiProtocol.build("C", [name])
+    
+    @staticmethod
+    def build_rotate(yaw_deg: float) -> bytes:
+        return AsciiProtocol.build("R", [f"{yaw_deg:.2f}"])
 
     # ---- 流式解析（状态机）----
     def __init__(self):
@@ -89,7 +95,7 @@ class AsciiProtocol:
 class SerialLink:
     """
     OrangePi/PC <-> STM32 串口（ASCII 协议）
-    - 发送：V/S/Q/P/T/C
+    - 发送：V/S/Q/P/T/C/R
     - 接收：A(ACK), E(Encoders) 等，分发到回调
     - 心跳：仅提供主循环兜底 heartbeat()，**不含独立心跳线程**
     """
@@ -112,7 +118,7 @@ class SerialLink:
 
         self.proto = AsciiProtocol()
         self.last_tx_time: float = 0.0              # 最近一次发送任意帧的时间
-        self._last_cmd_xyw: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+        self._last_cmd_xy: Tuple[float, float] = (0.0, 0.0)
 
 
         # 回调（按需绑定）
@@ -148,10 +154,10 @@ class SerialLink:
         self.ser.write(b)
         self.last_tx_time = time.time()
 
-    def send_vel_xyw(self, vx: float, vy: float, w: float):
+    def send_vel_xy(self, x: float, y: float):
         """ 全向速度命令：$Vvx,vy,w# """
-        self._last_cmd_xyw = (float(vx), float(vy), float(w))
-        self._send_bytes(self.proto.build_vel_xyw(vx, vy, w))
+        self._last_cmd_xy = (float(x), float(y))
+        self._send_bytes(self.proto.build_vel_xy(x, y))
 
     def send_stop(self):
         """急停：$S#"""
@@ -172,6 +178,10 @@ class SerialLink:
     def arm_preset(self, name: str):
         """机械臂预设动作：$Cname#（如 GRAB/REL）"""
         self._send_bytes(self.proto.build_arm_preset(name))
+        
+    def rotate(self, yaw_deg: float):
+        """旋转：$Ryaw_deg#"""
+        self._send_bytes(self.proto.build_rotate(yaw_deg))
 
     # ---------- 接收线程 ----------
     def _rx_loop(self):
@@ -226,12 +236,12 @@ class SerialLink:
         在你的主控制循环里周期调用：
           - 若 interval_s 内未发送任何帧，则自动发送一条保活速度
           - mode == "zero": 发送 $V0,0#
-          - mode == "last": 重发上一条 $Vv,w#
+          - mode == "last": 重发上一条 $Vx,y#
         """
         now = time.time()
         if now - self.last_tx_time > interval_s:
             if mode == "zero":
-                vx, vy, w = 0.0, 0.0, 0.0
+                x, y = 0.0, 0.0
             else:
-                vx, vy, w = self._last_cmd_xyw
-            self.send_vel_xyw(vx, vy, w)
+                x, y = self._last_cmd_xy
+            self.send_vel_xy(x, y)

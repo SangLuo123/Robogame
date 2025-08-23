@@ -7,8 +7,11 @@
 ``` python
 git add <file>
 git commit -m "commit message"
-git push
+git push <remote> <branch>
 git log
+git branch <name>
+git branch
+git checkout
 # git remote add origin https://github.com/SangLuo123/Robogame 
 ```
 ## vnc
@@ -55,6 +58,9 @@ P 控制导航到点\
 
 Pure Pursuit 路径跟踪\
 如果要走多个点/轨迹，用这个很方便
+
+<span style="color:red">注意</span>\
+填入tag_map的四个点对应的是实际四个点
 ## 一些语法
 Optional[X] 其实就是 Union[X, None] 的简写，意思是这个变量 可以是类型 X，也可以是 None。
 
@@ -92,3 +98,9 @@ tag 码边长12cm，纸边长14.9cm\
 
 打击区的tag_id是2
 常规弹药区的tag_id是3
+## 传输文件
+前提能ping通（开启ssh）
+
+香橙派传本机`scp -r orangepi@192.168.184.200:/home/orangepi/Robogame "D:\Desktop\robogame\Robogame"`
+
+本机传香橙派: 后面两个参数反过来即可

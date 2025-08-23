@@ -55,7 +55,7 @@ def tag_T_from_world_corners(tl, tr, br, bl):
 
 # ========== 配置 & 初始化相关 ==========
 
-def load_config(path="data/config.json"):
+def load_config(path):
     """
     读取项目配置（若没有就给默认值）
     内容建议包含：串口、tag_size、T_robot_cam、tag_map、HSV、相机ID等
@@ -163,7 +163,8 @@ def do_grab(detector, frame):
 # ========== 主程序 ==========
 
 def main():
-    cfg = load_config()                     # 可换成 data/config.json
+    config_path = os.path.join(ROOT, "data", "config.json")
+    cfg = load_config(config_path)                     # 可换成 data/config.json
     calib_path = os.path.join(ROOT, "calib", "calib.npz")
 
     # 1) 相机标定参数
@@ -181,10 +182,10 @@ def main():
         hsv_params=cfg["hsv_range"]
     )
     car = RobotCar(T_robot_cam, tag_map)
-    link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"], binary=True)
-    link.open()
+    # link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"], binary=True)
+    # link.open()
 
-    cap = open_camera(cfg["camera_index"])
+    # cap = open_camera(cfg["camera_index"])
     state = State.INIT
     goal = cfg["goal"]
     kv, ktheta = cfg["kv"], cfg["ktheta"]
@@ -192,81 +193,92 @@ def main():
     print("[INFO] 启动完成，进入主循环… 按 ESC 退出。")
     t0 = time.time()
 
-# TODO: 需要更新
-    try:
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                time.sleep(0.01)
-                continue
+# # TODO: 需要更新（很多需要改）
+#     try:
+#         while True:
+#             ok, frame = cap.read()
+#             if not ok:
+#                 time.sleep(0.01)
+#                 continue
 
-            # ========== 视觉检测 ==========
-            tags = det.detect_tags(frame)   # list of dict
-            best = choose_best_tag(tags)
-            if best:
-                # 假装一个“对象”传给 car（兼容之前的 update_pose_from_tag 接口）
-                dummy = type("D", (), {})() # 一个空对象，“D”是一个类
-                dummy.tag_id = best["tag_id"]
-                dummy.pose_R = best["pose_R"]
-                dummy.pose_t = best["pose_t"]
-                car.update_pose_from_tag(dummy)
+#             # ========== 视觉检测 ==========
+#             tags = det.detect_tags(frame)   # list of dict
+#             best = choose_best_tag(tags)
+#             if best:
+#                 # 假装一个“对象”传给 car（兼容之前的 update_pose_from_tag 接口）
+#                 dummy = type("D", (), {})() # 一个空对象，“D”是一个类
+#                 dummy.tag_id = best["tag_id"]
+#                 dummy.pose_R = best["pose_R"]
+#                 dummy.pose_t = best["pose_t"]
+#                 car.update_pose_from_tag(dummy)
 
-            # ========== 状态机 ==========
-            if state == State.INIT:
-                state = State.LOCATE
+#             # ========== 状态机 ==========
+#             if state == State.INIT:
+#                 state = State.LOCATE
 
-            elif state == State.LOCATE:
-                # 看到任意 tag 即可完成定位
-                if best:
-                    state = State.NAVIGATE
+#             elif state == State.LOCATE:
+#                 # 看到任意 tag 即可完成定位
+#                 if best:
+#                     state = State.NAVIGATE
 
-            elif state == State.NAVIGATE:
-                # 去目标点
-                vx, vy, w = car.compute_control_to_target(goal[0], goal[1], kv=kv, ktheta=ktheta)
-                # 简单限幅（可移到 comm 里）
-                vx = float(max(-0.6, min(0.6, vx)))
-                vy = float(max(-0.6, min(0.6, vy)))
-                w = float(max(-2.5, min(2.5, w)))
-                link.send_vel_xyw(vx, vy, w)
-
-                if reached_goal(car, goal, cfg["reach_tol_m"]):
-                    link.send_vel_xyw(0.0, 0.0, 0.0)
-                    state = State.GRAB
+#             elif state == State.NAVIGATE:
+#                 # 去目标点
+#                 # vx, vy, w = car.compute_control_to_target(goal[0], goal[1], kv=kv, ktheta=ktheta)
+#                 # # 简单限幅（可移到 comm 里）
+#                 # vx = float(max(-0.6, min(0.6, vx)))
+#                 # vy = float(max(-0.6, min(0.6, vy)))
+#                 # w = float(max(-2.5, min(2.5, w)))
+#                 # link.send_vel_xyw(vx, vy, w)
+#                 link.send_vel_xy(goal[0] - car.x, goal[1] - car.y)  # 简单的全向控制
+#                 # TODO: 得更新，收到下位机信号或检测到到达目标才进行下一步
+#                 if reached_goal(car, goal, cfg["reach_tol_m"]):
+#                     # link.send_vel_xyw(0.0, 0.0, 0.0)
+#                     state = State.GRAB
             
-            elif state == State.GRAB:
-                # 视觉定位抓取对象（占位）
-                grab_target = do_grab(det, frame)
-                # TODO: 通过串口发抓取命令/位姿给 STM32（未实现）
-                # link.send_command("GRAB ...")
-                state = State.DONE
+#             elif state == State.GRAB:
+#                 # 视觉定位抓取对象（占位）
+#                 grab_target = do_grab(det, frame)
+#                 # TODO: 通过串口发抓取命令/位姿给 STM32（未实现）
+#                 # link.send_command("GRAB ...")
+#                 state = State.DONE
 
-            elif state == State.DONE:
-                link.send_vel_xyw(0.0, 0.0, 0.0)  # 停止移动
-                # 这里可以进入下一任务或者直接停
-                pass
+#             elif state == State.DONE:
+#                 link.send_vel_xy(0.0, 0.0)  # 停止移动
+#                 # 这里可以进入下一任务或者直接停
+#                 pass
 
-            # 兜底心跳（主循环版）
-            link.heartbeat(interval_s=0.2)
+#             # 兜底心跳（主循环版）
+#             link.heartbeat(interval_s=0.2)
 
-            # ========== HUD 可视化 ==========
-            x, y, yaw = car.get_pose()
-            cv2.putText(frame, f"STATE:{state}", (10,30), 0, 0.7, (0,255,255), 2)
-            cv2.putText(frame, f"POSE x:{x:.2f} y:{y:.2f} yaw:{yaw:.1f}", (10,60), 0, 0.7, (0,255,0), 2)
-            if goal:
-                cv2.circle(frame, (30,30), 3, (0,255,255), -1)
-            cv2.imshow("Live", frame)
+#             # ========== HUD 可视化 ==========
+#             x, y, yaw = car.get_pose()
+#             cv2.putText(frame, f"STATE:{state}", (10,30), 0, 0.7, (0,255,255), 2)
+#             cv2.putText(frame, f"POSE x:{x:.2f} y:{y:.2f} yaw:{yaw:.1f}", (10,60), 0, 0.7, (0,255,0), 2)
+#             if goal:
+#                 cv2.circle(frame, (30,30), 3, (0,255,255), -1)
+#             cv2.imshow("Live", frame)
 
-            key = cv2.waitKey(1) & 0xFF
-            if key == 27:  # ESC
-                break
+#             key = cv2.waitKey(1) & 0xFF
+#             if key == 27:  # ESC
+#                 break
 
-    except KeyboardInterrupt:
-        pass
-    finally:
-        link.send_vel_xyw(0.0, 0.0, 0.0)  # 停止移动
-        link.close()
-        cap.release()
-        cv2.destroyAllWindows()
+#     except KeyboardInterrupt:
+#         pass
+#     finally:
+#         link.send_vel_xyw(0.0, 0.0, 0.0)  # 停止移动
+#         link.close()
+#         cap.release()
+#         cv2.destroyAllWindows()
+
+    img_path = os.path.join(ROOT, "img", "daji1.png")
+    print(f"[INFO] 读取图像: {img_path}")
+    img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+    tags = det.detect_tags(img)
+    print("检测到的标签：", tags)
+    best = choose_best_tag(tags)
+    if best:
+        print("选择的最佳标签：", best)
+        car.update_pose_from_tag(best)
 
 # ====== 入口 ======
 if __name__ == "__main__":

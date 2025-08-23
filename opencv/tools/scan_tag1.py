@@ -16,46 +16,56 @@ from src.transform import rt_to_T, T_inv
 
 # -----------修正误差-----------------
 
+def _cycles_and_dirs(pts):
+    # 生成 8 种顺序：4 个起点 × 顺/逆时针
+    idx = [0,1,2,3]
+    orders = []
+    for k in range(4):
+        r = idx[k:]+idx[:k]            # 旋转
+        orders.append(r)                # 顺时针
+        orders.append([r[0], r[3], r[2], r[1]])  # 逆时针（镜像）
+    # 去重
+    uniq = []
+    for o in orders:
+        if o not in uniq:
+            uniq.append(o)
+    return [np.array(o, int) for o in uniq]
+
 def _objp_from_tag_size(tag_size):
     """以Tag中心为原点的四角3D坐标（单位与tag_size一致），顺序: tl,tr,br,bl"""
     s = float(tag_size) / 2.0
     return np.array([[-s,-s,0], [s,-s,0], [s,s,0], [-s,s,0]], dtype=np.float32)
 
-def reprojection_stats_for_detection(det, K, dist, tag_size):
-    """
-    计算一次检测的重投影误差统计。
-    参数:
-      det: {'pose_R','pose_t','corners', ...}
-      K, dist: 相机内参/畸变
-      tag_size: Tag内黑框边长（单位随你体系：m 或 mm；需与pose一致）
-    返回:
-      dict: {
-        'per_point_err': np.ndarray shape=(4,),
-        'mean_err': float,    # 像素
-        'rms_err': float,     # 均方根（像素）
-        'max_err': float,
-        'proj': np.ndarray(4,2),  # 预测像素
-      }
-    """
+def reprojection_stats_for_detection(det, K, dist, tag_size_m):
     R = np.asarray(det["pose_R"], float).reshape(3,3)
     t = np.asarray(det["pose_t"], float).reshape(3,)
-    imgp = np.asarray(det["corners"], np.float32).reshape(-1,2)
-    objp = _objp_from_tag_size(tag_size)
+    imgp_raw = np.asarray(det["corners"], np.float32).reshape(-1,2)
+    objp_full = _objp_from_tag_size(tag_size_m)
 
     rvec, _ = cv2.Rodrigues(R)
-    proj, _ = cv2.projectPoints(objp, rvec, t.reshape(3,1), K, dist)
-    proj = proj.reshape(-1,2)
 
-    per = np.linalg.norm(proj - imgp, axis=1)
-    mean_err = float(per.mean())
-    rms_err  = float(np.sqrt((per**2).mean()))
-    max_err  = float(per.max())
+    best = None
+    for ord_idx in _cycles_and_dirs(imgp_raw):
+        imgp = imgp_raw[ord_idx]
+        objp = objp_full  # objp 的几何是固定的，换 imgp 的顺序即可
+        proj, _ = cv2.projectPoints(objp, rvec, t.reshape(3,1), K, dist)
+        proj = proj.reshape(-1,2)
+        per = np.linalg.norm(proj - imgp, axis=1)
+        mean_err = float(per.mean())
+        rms_err  = float(np.sqrt((per**2).mean()))
+        max_err  = float(per.max())
+        cand = (mean_err, rms_err, max_err, proj, ord_idx)
+        if (best is None) or (cand[0] < best[0]):
+            best = cand
+
+    mean_err, rms_err, max_err, proj, ord_idx = best
     return {
-        "per_point_err": per,
+        "per_point_err": np.linalg.norm(proj - imgp_raw[ord_idx], axis=1),
         "mean_err": mean_err,
         "rms_err": rms_err,
         "max_err": max_err,
-        "proj": proj
+        "proj": proj,
+        "corner_order": ord_idx.tolist()
     }
 
 def filter_and_weight(detections, K, dist, tag_size, px_thresh=2.0):
@@ -222,7 +232,7 @@ def to_T(R, t):
 
 def yaw_of_T(T):
     R = T[:3,:3]
-    return math.atan2(R[1,2], R[0,2])  # rad
+    return math.atan2(R[1,0], R[0,0])  # rad
 
 def world_robot_from_detection(det: dict, tag_map: dict, T_robot_cam: np.ndarray):
     """
@@ -256,131 +266,8 @@ def world_robot_from_detection(det: dict, tag_map: dict, T_robot_cam: np.ndarray
     yaw_deg = math.degrees(yaw_of_T(T_wr))
     return T_wr, (x, y, yaw_deg)
 
-# # ------------选择最优tag-------------
-
-# def _poly_area_px(corners):
-#     c = np.asarray(corners, float).reshape(-1,2)
-#     x, y = c[:,0], c[:,1]
-#     return 0.5 * abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
-
-# def _view_cos_from_Rct(R_ct):
-#     # tag法向在相机系：n_c = R_ct @ [0,0,1]
-#     n_c = np.asarray(R_ct, float)[:,2]
-#     return float(n_c[2])  # 与相机Z轴的余弦（越接近1越正对相机）
-
-# def _ang_diff_deg(a, b):
-#     d = (a - b + 180.0) % 360.0 - 180.0
-#     return abs(d)
-
-# def _pose_diff(p1, p2):
-#     # p=(x,y,yaw_deg) -> 返回“xy距离 + 角度代价(按系数换算成距离)”
-#     (x1,y1,yaw1), (x2,y2,yaw2) = p1, p2
-#     dxy = math.hypot(x1-x2, y1-y2)
-#     dyaw = _ang_diff_deg(yaw1, yaw2)
-#     # 将角度差换算成等效mm代价（可调，假设 1°≈2mm）
-#     return dxy + 2.0*dyaw
-
-# def choose_robot_pose_from_tags(
-#     detections, K, dist, tag_size, tag_map, T_robot_cam,
-#     reprojection_stats_for_detection, world_robot_from_detection,
-#     _fuse_poses_by_weight,
-#     primary_id=None,
-#     prev_pose=None,
-#     px_thresh=2.5,
-#     max_view_deg=50.0,
-#     do_fuse=True,
-#     xy_tol=30.0,     # mm，可按你单位调整
-#     yaw_tol=5.0      # deg
-# ):
-#     """
-#     返回: (pose, source, debug) 或 (None, reason, debug)
-#       pose = (x, y, yaw_deg)  # 世界<-机器人
-#       source: 说明字符串
-#       debug: 供打印的细节
-#     """
-#     cand = []
-#     deb  = []
-
-#     for d in (detections or []):
-#         # 1) 重投影质量
-#         stats = reprojection_stats_for_detection(d, K, dist, tag_size)
-#         mean_err = stats["mean_err"]
-#         if not np.isfinite(mean_err) or mean_err > px_thresh:
-#             deb.append(f"id={d['tag_id']} drop: mean_err={mean_err:.2f}")
-#             continue
-
-#         # 2) 世界位姿（世界<-机器人）
-#         try:
-#             T_wr, pose = world_robot_from_detection(d, tag_map, T_robot_cam)
-#         except KeyError:
-#             deb.append(f"id={d.get('tag_id')} drop: not-in-map")
-#             continue
-
-#         # 3) 视角与像素尺度
-#         R_ct = np.asarray(d["pose_R"], float).reshape(3,3)
-#         cos  = _view_cos_from_Rct(R_ct)     # 1最佳, 0=90°
-#         view_deg = math.degrees(math.acos(max(-1.0, min(1.0, cos))))
-#         if view_deg > max_view_deg:
-#             deb.append(f"id={d['tag_id']} drop: view={view_deg:.1f}°")
-#             continue
-
-#         area = _poly_area_px(d["corners"])
-#         dm   = float(d.get("decision_margin", 0.0))
-
-#         # 4) 与上一帧的接近度
-#         diff_prev = _pose_diff(pose, prev_pose) if prev_pose is not None else 0.0
-
-#         # 5) 综合评分（系数可调）
-#         a,b,c,dw,e = 10.0, 1.5, 0.001, 0.1, 0.02
-#         score = a*(1.0/(mean_err + 1e-6)) + b*(cos) + c*(area) + dw*(dm) - e*(diff_prev)
-
-#         w = 1.0/(mean_err + 1e-6)  # 融合权重
-#         cand.append({
-#             "id": int(d["tag_id"]),
-#             "pose": pose,
-#             "w": w,
-#             "err": mean_err,
-#             "cos": cos,
-#             "area": area,
-#             "dm": dm,
-#             "score": score
-#         })
-
-#     if not cand:
-#         return None, "no tag passed gates", deb
-
-#     # 6) 若设主ID且在候选里，优先它
-#     if primary_id is not None:
-#         fav = [c for c in cand if c["id"] == int(primary_id)]
-#         if fav:
-#             best = max(fav, key=lambda c: c["score"])
-#             return best["pose"], f"primary id={primary_id}", deb
-
-#     # 7) 一致性检查：若多张且相互接近 -> 融合
-#     if do_fuse and len(cand) >= 2:
-#         ok = True
-#         for i in range(len(cand)):
-#             for j in range(i+1, len(cand)):
-#                 p1, p2 = cand[i]["pose"], cand[j]["pose"]
-#                 if (math.hypot(p1[0]-p2[0], p1[1]-p2[1]) > xy_tol) or (_ang_diff_deg(p1[2], p2[2]) > yaw_tol):
-#                     ok = False; break
-#             if not ok: break
-#         if ok:
-#             fused = _fuse_poses_by_weight([(*c["pose"], c["w"]) for c in cand])
-#             return fused, f"fused {len(cand)} tags", deb
-
-#     # 8) 否则：选评分最高 或 选离上一帧最近
-#     if prev_pose is not None:
-#         best = min(cand, key=lambda c: _pose_diff(c["pose"], prev_pose))
-#         return best["pose"], f"closest-to-prev id={best['id']}", deb
-#     else:
-#         best = max(cand, key=lambda c: c["score"])
-#         return best["pose"], f"best-single id={best['id']}", deb
-
-# # ---------------------------------------------------------
-
 if __name__ == "__main__":
-    img = cv2.imread(os.path.join(ROOT, "img", "daji2.png"))
+    img = cv2.imread(os.path.join(ROOT, "img", "daji1.png"))
     calib_path = os.path.join(ROOT, "calib", "calib.npz")
     det = tag(img, calib_path)
     if det:
@@ -422,24 +309,3 @@ if __name__ == "__main__":
     dist = None
     out = filter_and_weight(det, mtx, dist, 120, px_thresh=2.0)
     print("After filtering/weighting:", out)
-    
-    # pose, src, dbg = choose_robot_pose_from_tags(
-    #     detections=detections, K=K_used, dist=dist_used, tag_size=TAG_SIZE_USED,
-    #     tag_map=tag_map, T_robot_cam=T_robot_cam,
-    #     reprojection_stats_for_detection=reprojection_stats_for_detection,
-    #     world_robot_from_detection=world_robot_from_detection,
-    #     _fuse_poses_by_weight=_fuse_poses_by_weight,
-    #     primary_id=YOUR_PRIMARY_ID,     # 没有就写 None
-    #     prev_pose=last_pose,            # 没有就 None
-    #     px_thresh=2.5,
-    #     max_view_deg=50.0,
-    #     do_fuse=True,
-    #     xy_tol=30.0, yaw_tol=5.0
-    # )
-    # if pose is not None:
-    #     x,y,yaw = pose
-    #     # 用这个姿态
-    #     last_pose = pose  # 供下一帧抗抖
-    # else:
-    #     # 没有可用标签，做兜底处理
-    #     pass

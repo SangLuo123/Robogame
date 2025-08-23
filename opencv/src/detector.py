@@ -23,7 +23,7 @@ class Detector:
         self.tag_detector = AprilTagDetector(
             families=tag_families,
             nthreads=2, # 多线程加速
-            quad_decimate=1.5, # 图像金字塔下采样倍数。>1 表示先把图缩小再做边缘/四边形搜索。
+            quad_decimate=1.0, # 图像金字塔下采样倍数。>1 表示先把图缩小再做边缘/四边形搜索。
             refine_edges=True # 是否对检测到的四边形角点做亚像素级边缘细化。开启（True）通常能提高角点定位精度 → 位姿估计更准，但会略微变慢。
         )
 

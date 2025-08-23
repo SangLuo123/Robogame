@@ -67,7 +67,7 @@ def calibrate(folder="/home/orangepi/Robogame/opencv/calib/img/*.png", save="cal
     return mtx, dist, img_size
 
 mtx, dist, img_size = calibrate()
-print(Camera_Intrinsic)
+
 
 
 # print(Camera_Intrinsic)
