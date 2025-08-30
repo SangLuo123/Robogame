@@ -1,8 +1,45 @@
 {
     "serial_port": "/dev/ttlUSB0",
     "baud": 115200,
-    "camera_index": 0,
     "tag_size": 120,
+    "cameras": [
+        {
+            "id": "cam1",
+            "device": "/dev/cam_down",
+            "calib": "data/calib/camdown.npz",
+            "role": "tag+dart",
+            "hsv": {
+                "lower": [
+                    0,
+                    75,
+                    148
+                ],
+                "upper": [
+                    13,
+                    235,
+                    255
+                ]
+            }
+        },
+        {
+            "id": "cam0",
+            "device": "/dev/cam_up",
+            "calib": "data/calib/camup.npz",
+            "role": "tag+led",
+            "hsv": {
+                "lower": [
+                    45,
+                    60,
+                    80
+                ],
+                "upper": [
+                    85,
+                    255,
+                    255
+                ]
+            }
+        }
+    ],
     "hsv_range": {
         "lower": [
             0,
@@ -15,29 +52,55 @@
             255
         ]
     },
-    "T_robot_cam": {
-        "R": [
-            [
-                1,
-                0,
-                0
+    "T_robot_cam_for": {
+        "cam0": {
+            "R": [
+                [
+                    1,
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    0,
+                    1
+                ]
             ],
-            [
-                0,
-                1,
-                0
-            ],
-            [
-                0,
-                0,
-                1
+            "t": [
+                0.0,
+                0.0,
+                0.0
             ]
-        ],
-        "t": [
-            0.0,
-            0.0,
-            0.0
-        ]
+        },
+        "cam1": {
+            "R": [
+                [
+                    1,
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    0,
+                    1
+                ]
+            ],
+            "t": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        }
     },
     "tag_map": {
         "3": {
@@ -157,5 +220,12 @@
     ],
     "reach_tol_m": 0.10,
     "kv": 0.6,
-    "ktheta": 1.2
+    "ktheta": 1.2,
+    "sync": {
+        "max_skew_ms": 80,
+        "timeout_ms": 300
+    },
+    "display": {
+        "window_width": 960
+    }
 }

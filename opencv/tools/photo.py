@@ -31,7 +31,7 @@ def main():
     os.makedirs(SAVE_DIR, exist_ok=True)
 
     # 1) 打开摄像头
-    cap = cv2.VideoCapture(CAM_INDEX)
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("ERROR: 无法打开摄像头")
         return

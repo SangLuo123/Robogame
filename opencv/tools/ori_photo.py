@@ -1,14 +1,11 @@
 import cv2
 import os
 
-camera_choose = "up"
-camera_index = "/dev/cam_up" if camera_choose == "up" else "/dev/cam_down"
 # 创建保存目录
-save_dir = "/home/orangepi/Robogame/opencv/calib/img" + str(camera_choose)
-print("保存目录：", save_dir)
+save_dir = "./img"
 os.makedirs(save_dir, exist_ok=True)
 
-camera = cv2.VideoCapture(camera_index)
+camera = cv2.VideoCapture(2)
 if not camera.isOpened():
     print("无法打开摄像头")
     exit()

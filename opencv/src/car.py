@@ -4,7 +4,7 @@ from src.transform import rt_to_T, T_inv, T_to_xyyaw
 
 # ======== 小车类 ========
 class RobotCar:
-    def __init__(self, T_robot_cam, tag_map):
+    def __init__(self, tag_map):
         """
         T_robot_cam: 4x4, 机器人←相机的外参矩阵
         tag_map: dict[tag_id] = T_world_tag(4x4), 世界←tag 的位姿
@@ -14,10 +14,13 @@ class RobotCar:
         self.y = 0.0
         self.yaw = 0.0  # 度
 
-        self.T_robot_cam = T_robot_cam
+        self.T_robot_cam_for = {}
         self.tag_map = tag_map
 
-    def update_pose_from_tag(self, det):
+    def set_camera_extrinsic(self, cam_id, T_robot_cam):
+        self.T_robot_cam_for[str(cam_id)] = T_robot_cam
+
+    def update_pose_from_tag(self, det, cam_id=None, T_robot_cam=None):
         # 传参det，根据单个tag进行更新，tag的选取在调用处完成
         """
         根据单个 AprilTag 检测结果更新小车位姿
@@ -28,11 +31,19 @@ class RobotCar:
         # print("contains? ->", det["tag_id"] in self.tag_map)
         if det["tag_id"] not in self.tag_map:
             return False
+        
+        if T_robot_cam is not None:
+            T_rc = T_robot_cam
+        elif cam_id is not None and str(cam_id) in self.T_robot_cam_for:
+            T_rc = self.T_robot_cam_for[str(cam_id)]
+        else:
+            T_rc = None
+        
         T_world_tag = self.tag_map[det["tag_id"]]
         T_cam_tag = rt_to_T(det["pose_R"], det["pose_t"])
 
         # 世界←小车
-        T_world_robot = T_world_tag @ T_inv(T_cam_tag) @ T_inv(self.T_robot_cam)
+        T_world_robot = T_world_tag @ T_inv(T_cam_tag) @ T_inv(T_rc)
         self.pose_world = T_world_robot
         self.x, self.y, self.yaw = T_to_xyyaw(T_world_robot)
         print(f"更新小车位姿: x={self.x:.2f}, y={self.y:.2f}, yaw={self.yaw:.1f}°")

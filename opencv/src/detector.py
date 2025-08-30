@@ -29,6 +29,7 @@ class Detector:
 
     def detect_tags(self, frame, estimate_pose=True):
         """
+        输入的是未去畸变的图像
         检测 AprilTag，返回检测结果列表
         每个元素包含:
           tag_id: int
@@ -36,24 +37,73 @@ class Detector:
           pose_t: 3x1 numpy array
           corners: 4x2 numpy array
         """
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        H, W = frame.shape[:2]
+        
+        # 1) 读取原始内参与畸变（已保证存在）
+        K_orig = np.asarray(self.camera_matrix, dtype=np.float64)
+        dist = np.asarray(self.dist_coeffs, dtype=np.float64).reshape(-1, 1)
+        
+        # 2) 懒加载/缓存去畸变映射；alpha=0 裁黑边（可通过 self.undist_alpha=0~1 调整）
+        alpha = float(getattr(self, "undist_alpha", 0.0))  # 0=裁黑边, 1=尽量保视场
+        cache = getattr(self, "_ud_cache", None)
+        need_reinit = True
+        if cache is not None:
+            same_size  = cache.get("size")  == (W, H)
+            same_alpha = cache.get("alpha") == alpha
+            same_K     = np.array_equal(cache.get("K_orig"), K_orig)
+            same_dist  = np.array_equal(cache.get("dist"), dist)
+            need_reinit = not (same_size and same_alpha and same_K and same_dist)
+
+        if need_reinit:
+            K_new, valid_roi = cv2.getOptimalNewCameraMatrix(K_orig, dist, (W, H), alpha, (W, H))
+            map1, map2 = cv2.initUndistortRectifyMap(K_orig, dist, None, K_new, (W, H), cv2.CV_16SC2)
+            self._ud_cache = {
+                "map1": map1, "map2": map2,
+                "K_new": K_new, "valid_roi": valid_roi,
+                "size": (W, H), "alpha": alpha,
+                "K_orig": K_orig.copy(), "dist": dist.copy(),
+            }
+
+        map1 = self._ud_cache["map1"]; map2 = self._ud_cache["map2"]
+        K_new = self._ud_cache["K_new"]
+        x0, y0, ww, hh = self._ud_cache["valid_roi"]  # 去畸变后有效区域
+
+        # 3) 去畸变 + 裁掉黑边
+        undist_full = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
+        undist = undist_full[y0:y0+hh, x0:x0+ww]
+
+        # 4) 计算裁剪后对应的新内参（主点需减去裁剪偏移）
+        K_crop = K_new.copy()
+        K_crop[0, 2] -= x0
+        K_crop[1, 2] -= y0
+
+        # 存一下当前使用的内参与 ROI（可用于外部可视化/投影）
+        self._K_used = K_crop
+        self._undist_roi = (x0, y0, ww, hh)
+
+        fx, fy, cx, cy = map(float, (K_crop[0,0], K_crop[1,1], K_crop[0,2], K_crop[1,2]))
+
+        # 5) 在“无畸变+裁剪”的图上检测（针孔模型，畸变=0）
+        gray = cv2.cvtColor(undist, cv2.COLOR_BGR2GRAY)
         results = self.tag_detector.detect(
             gray,
-            estimate_tag_pose=estimate_pose, # 是否直接在检测阶段估计位姿。
-            camera_params=(self.fx, self.fy, self.cx, self.cy),
+            estimate_tag_pose=estimate_pose,
+            camera_params=(fx, fy, cx, cy),   # ★关键：用更新后的参数
             tag_size=self.tag_size
         )
 
+        # 6) 组装返回
         detections = []
         for r in results:
-            det = {
-                "tag_id": r.tag_id, # 标签 ID
-                "pose_R": r.pose_R, # 相机坐标系下tag的旋转矩阵
-                "pose_t": r.pose_t, # 相机坐标系下tag的平移向量
-                "corners": r.corners # tag 在图像坐标系下的 四个角点坐标 (4×2 像素点)。
-            }
-            detections.append(det)
+            detections.append({
+                "tag_id": int(r.tag_id),
+                "pose_R": None if not estimate_pose else np.asarray(r.pose_R, dtype=np.float64),
+                "pose_t": None if not estimate_pose else np.asarray(r.pose_t, dtype=np.float64).reshape(3,1),
+                # 角点在“去畸变+裁剪后的图像坐标系”
+                "corners": np.asarray(r.corners, dtype=np.float64)
+            })
         return detections
+
 
     def detect_dart(self, frame):
         """

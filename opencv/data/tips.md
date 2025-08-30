@@ -101,6 +101,10 @@ tag 码边长12cm，纸边长14.9cm\
 ## 传输文件
 前提能ping通（开启ssh）
 
-香橙派传本机`scp -r orangepi@192.168.184.200:/home/orangepi/Robogame "D:\Desktop\robogame\Robogame"`
+香橙派传本机`scp -r orangepi@192.168.184.200:/home/orangepi/Robogame "D:\Desktop\robogame"`
 
 本机传香橙派: 后面两个参数反过来即可
+## 双摄像头
+/dev/cam_up 对应上面个usb连的摄像头
+/dev/cam_down 对应下面个usb连的摄像头
+现暂时规定上面个连接新买的摄像头（112r），下面个连接旧的摄像头（158r）

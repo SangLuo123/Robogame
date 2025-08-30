@@ -25,17 +25,22 @@ opencv/
 | ├── __pycache__/
 | ├── car.py                --小车的类
 | ├── comm.py               --与下位机交流的类以及通信协议
+| ├── detect_dart1.py       --根据传入的ROI自动分析飞镖的HSV范围并计算ROI中目标飞镖的面积占比决定是否有飞镖
 | ├── detector.py           --检测器的类
 | ├── host_main.py          --测试通信
+| ├── load.py               --加载配置的函数
 | ├── main.py               --主函数
 | ├── TODO.md               --未完成的任务
 | └── transform.py          --坐标变换时用到的一些矩阵相关的函数
-├── tools/                  
+├── tools/      
+| ├── img/                  --临时图片        
 | ├── find_obj.py           --使用掩码识别飞镖
-| ├── get_param.py          --通过窗口找到飞镖的HSV参数
+| ├── get_param.py          --通过窗口找到飞镖的HSV参数（窗口中图像已经去畸变以及预处理）
+| ├── mark.py               --提取ROI且根据掩码提取
+| ├── ori_photo             --使用原相机拍照并存入img文件夹
 | ├── photo.py              --去畸变后的相机并拍照
+| ├── roi.py                --找ROI工具
 | ├── scan_tag.py           --识别tag
 | ├── scan_tag1.py          --识别tag，并重投影自动排序计算误差
-| ├── try.py                --AI写的识别Apriltag代码
 | └── use_camera.py         --直接调用摄像头以及一些预处理结果
 ```

@@ -18,6 +18,8 @@ class AsciiProtocol:
       Q: $Q#
       E: $E<e1>,<e2>,...#          (下位机回复)
       A: $AOK# / $AERR,<code>#     (下位机回复)
+      T: (下位机回复，保留)
+      F: (下位机回复，保留)
       P: $P<rpm>#
       T: $T#                        (触发发射)
       C: $C<name>#                  (机械臂预设动作)
@@ -155,7 +157,7 @@ class SerialLink:
         self.last_tx_time = time.time()
 
     def send_vel_xy(self, x: float, y: float):
-        """ 全向速度命令：$Vvx,vy,w# """
+        """ 位移命令：$Vx,y# """
         self._last_cmd_xy = (float(x), float(y))
         self._send_bytes(self.proto.build_vel_xy(x, y))
 

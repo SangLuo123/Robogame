@@ -3,6 +3,9 @@ import cv2
 import glob
 import math
 
+camera_choose = "up"
+camera_index = "/dev/cam_up" if camera_choose == "up" else "/dev/cam_down"
+
 height = 6 
 width = 9
 length = 24.3
@@ -66,7 +69,10 @@ def calibrate(folder="/home/orangepi/Robogame/opencv/calib/img/*.png", save="cal
     print("K=\n", mtx, "\ndist=\n", dist)
     return mtx, dist, img_size
 
-mtx, dist, img_size = calibrate()
+
+folder="/home/orangepi/Robogame/opencv/calib/img" + str(camera_choose) + "/*.png"
+save="calib" + str(camera_choose) + ".npz"
+mtx, dist, img_size = calibrate(folder, save)
 
 
 
