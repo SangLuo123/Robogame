@@ -59,6 +59,7 @@ class AsciiProtocol:
     
     @staticmethod
     def build_rotate(yaw_deg: float) -> bytes:
+        # 默认逆时针？
         return AsciiProtocol.build("R", [f"{yaw_deg:.2f}"])
 
     # ---- 流式解析（状态机）----
@@ -157,6 +158,7 @@ class SerialLink:
         self.last_tx_time = time.time()
 
     def send_vel_xy(self, x: float, y: float):
+        # 单位：mm，正前方为x，正左方为y
         """ 位移命令：$Vx,y# """
         self._last_cmd_xy = (float(x), float(y))
         self._send_bytes(self.proto.build_vel_xy(x, y))

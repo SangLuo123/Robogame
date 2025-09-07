@@ -170,28 +170,31 @@ def vote_presence(present_flags, need_true=3):
     """
     return sum(bool(x) for x in present_flags) >= int(need_true)
 
-img_path = os.path.join(ROOT, "tools/img", "1.png")
-frames = [cv2.imread(img_path)]  # 你自己的样片列表
-# 假设你已经采集了几张样片 frames（BGR），并知道该孔的 ROI
-roi = (332, 285, 94, 94)  # 或 roi_poly=[(x1,y1),...]
+def find_dart(frames, roi):
+    # 传多个frame
+    # img_path = os.path.join(ROOT, "tools/img", "1.png")
+    # frames = [cv2.imread(img_path)]  # 你自己的样片列表
+    # 假设你已经采集了几张样片 frames（BGR），并知道该孔的 ROI
+    # roi = (332, 285, 94, 94)  # 或 roi_poly=[(x1,y1),...]
 
-hsv_thr, stats = calibrate_hsv_thresholds(frames, roi_rect=roi)
-print("建议阈值:", hsv_thr, "样本范围(H/S/V):", stats)
-# 把 hsv_thr 存成 JSON，比赛时直接读
+    hsv_thr, stats = calibrate_hsv_thresholds(frames, roi_rect=roi)
+    print("建议阈值:", hsv_thr, "样本范围(H/S/V):", stats)
+    # 把 hsv_thr 存成 JSON，比赛时直接读
 
-present_flags = []
-for _ in range(1):  # 连续5帧投票
-    frame = frames[0]  # 你自己的实时帧
-    present, ratio, out = detect_dart_in_roi(
-        frame, roi_rect=roi, hsv_thr=hsv_thr,
-        area_ratio_thresh=0.18, return_debug=True
-    )
-    print("该孔面积占比: %.3f, 判定有飞镖: %s" % (ratio, present))
-    present_flags.append(present)
-    # 可视化查看
-    cv2.imshow("overlay", out["overlay"])
-    cv2.imshow("mask", out["mask"])
-    cv2.waitKey(0)
+    present_flags = []
+    for _ in range(5):  # 连续5帧投票
+        frame = frames[0]  # 你自己的实时帧
+        present, ratio, out = detect_dart_in_roi(
+            frame, roi_rect=roi, hsv_thr=hsv_thr,
+            area_ratio_thresh=0.18, return_debug=True
+        )
+        print("该孔面积占比: %.3f, 判定有飞镖: %s" % (ratio, present))
+        present_flags.append(present)
+        # 可视化查看
+        # cv2.imshow("overlay", out["overlay"])
+        # cv2.imshow("mask", out["mask"])
+        # cv2.waitKey(0)
 
-final_decision = vote_presence(present_flags, need_true=1)
-print("该孔是否有飞镖:", final_decision)
+    final_decision = vote_presence(present_flags, need_true=1)
+    print("该孔是否有飞镖:", final_decision)
+    return final_decision

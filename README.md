@@ -4,9 +4,11 @@ This project is used for USTC Robogame2025.
 ```
 opencv/
 ├── calib/
-| ├── img/                  --标定相机用的图片
+| ├── imgdown/              --标定旧相机用的图片
+| ├── imgup/                --标定新相机用的图片
 | ├── calc.py               --计算内参矩阵和畸变参数并调用摄像头根据计算结果实时测算棋盘格位姿
-| ├── calib.npz             --标定得到的数据
+| ├── calibdown.npz         --标定得到的数据
+| ├── calibup.npz           --标定得到的数据
 | ├── findChess.py          --测试找棋盘格
 | ├── take_photos.py        --拍标定相机的图片
 | └── undistort.py          --测试去畸变后的相机
@@ -25,11 +27,14 @@ opencv/
 | ├── __pycache__/
 | ├── car.py                --小车的类
 | ├── comm.py               --与下位机交流的类以及通信协议
+| ├── demo_twocam.py        --测试两个相机
 | ├── detect_dart1.py       --根据传入的ROI自动分析飞镖的HSV范围并计算ROI中目标飞镖的面积占比决定是否有飞镖
 | ├── detector.py           --检测器的类
 | ├── host_main.py          --测试通信
 | ├── load.py               --加载配置的函数
-| ├── main.py               --主函数
+| ├── main.py               --两个相机主函数
+| ├── main1.py              --一个相机主函数
+| ├── multicam.py           --多相机管理函数
 | ├── TODO.md               --未完成的任务
 | └── transform.py          --坐标变换时用到的一些矩阵相关的函数
 ├── tools/      
