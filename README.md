@@ -28,14 +28,16 @@ opencv/
 | ├── car.py                --小车的类
 | ├── comm.py               --与下位机交流的类以及通信协议
 | ├── demo_twocam.py        --测试两个相机
-| ├── detect_dart1.py       --根据传入的ROI自动分析飞镖的HSV范围并计算ROI中目标飞镖的面积占比决定是否有飞镖
+| ├── detect_dart.py       --根据传入的ROI自动分析飞镖的HSV范围并计算ROI中目标飞镖的面积占比决定是否有飞镖
 | ├── detector.py           --检测器的类
 | ├── host_main.py          --测试通信
 | ├── load.py               --加载配置的函数
 | ├── main.py               --两个相机主函数
 | ├── main1.py              --一个相机主函数
+| ├── main2.py              --暂时的主流程函数
+| ├── main3.py              --一个相机主函数，但是使用更新后的car和multicam
 | ├── multicam.py           --多相机管理函数
-| ├── TODO.md               --未完成的任务
+| ├── test_main             --测试主函数
 | └── transform.py          --坐标变换时用到的一些矩阵相关的函数
 ├── tools/      
 | ├── img/                  --临时图片        

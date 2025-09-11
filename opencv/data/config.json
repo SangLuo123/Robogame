@@ -236,12 +236,41 @@
             90
         ]
     },
-    "reach_tol_m": 0.10,
     "sync": {
         "max_skew_ms": 80,
         "timeout_ms": 300
     },
     "display": {
         "window_width": 960
+    },
+    "dart1_roi": [
+        332,
+        285,
+        94,
+        94
+    ],
+    "dart2_roi": [
+        332,
+        285,
+        94,
+        94
+    ],
+    "led_roi": [
+        10,
+        10,
+        50,
+        50
+    ],
+    "led_hsv_range": {
+        "lower": [
+            0,
+            100,
+            100
+        ],
+        "upper": [
+            10,
+            255,
+            255
+        ]
     }
 }

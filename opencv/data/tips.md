@@ -12,6 +12,27 @@ git log
 git branch <name>
 git branch
 git checkout
+git status
+git log
+git reset --hard HEAD^
+git checkout -- file
+git reset HEAD <file>
+git checkout -b dev
+git branch dev
+git checkout dev
+git branch
+git checkout master
+git switch -c dev
+git switch dev
+git merge <name>
+git branch -d <name>
+git merge --no-ff -m "merge with no-ff" dev
+git stash
+git stash list
+git stash apply
+git stash drop
+git stash pop
+git cherry-pick 4c805e2
 # git remote add origin https://github.com/SangLuo123/Robogame 
 ```
 ## vnc

@@ -32,6 +32,14 @@ class State:
     DONE = 5
     FAIL = 6
     GRAB = 7
+    
+def start_heartbeat(link, interval=0.2):
+    def run():
+        while True:
+            link.heartbeat(interval_s=interval)
+            time.sleep(interval)
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
 
 # ========== 一些函数 ==========
 
@@ -161,7 +169,7 @@ def go_to_ack_then_optional_tag_verify(
     move_timeout=6.0,
     rot_timeout=4.0,
     verify_window=0.8,    # DONE 后给这段时间扫描 tag
-    max_corrections=1,    # 校验失败允许的纠正次数
+    max_corrections=2,    # 校验失败允许的纠正次数
     scan_fn=None          # e.g. lambda: get_tags(mc, det0, det1, car)
 ):
     """
@@ -374,6 +382,7 @@ def main():
     car.set_camera_extrinsic("cam1", T_robot_cam_1)
     link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"])
     link.open()
+    start_heartbeat(link, interval=0.2) # 启动心跳线程
 
     # cap = open_camera(cfg["camera_index"])
     state = State.INIT
@@ -401,209 +410,11 @@ def main():
     led_roi = cfg["led_roi"]
     last_state = None # TODO: 待更新
     led_hsv_range = cfg["led_hsv_range"] # TODO: 待更新
-    while True:
-        if state == State.INIT_CHECKS:
-            # 初始阶段，检测各模块
-            if wait_ready(mc, ["cam0", "cam1"], timeout_s=3.0):
-                print("[INFO] 两路相机已就绪")
-                last_state = state
-                state = State.INITIAL_LOCATE
-            else:
-                print("[ERR] 相机初始化失败")
-                last_state = state
-                state = State.FAIL
+    
+    wait_ready(mc, ["cam0", "cam1"], timeout_s=3.0)
+    print("[INFO] 两路相机已就绪")
+    
 
-        elif state == State.INITIAL_LOCATE:
-            # 如果初始位置扫不到tag
-            tag = get_tags(mc, det0, det1, car)
-            if tag is None:
-                # 到一个一定能扫到tag的位置
-                goal_init = (2100, 2500, 90)
-                res = go_to_ack_then_optional_tag_verify(
-                    car, goal_init, link,
-                    pos_tol=50.0, yaw_tol=5.0,
-                    move_timeout=6.0, rot_timeout=4.0,
-                    verify_window=0.8,
-                    max_corrections=1,
-                    scan_fn=scan_fn
-                )
-                print("[RESULT]", res)
-            else:
-                print("[INFO] 初始定位成功")
-            last_state = state
-            state = State.GO_DART1
-                
-
-        elif state == State.GO_DART1:
-            """
-            上一个状态的可能情况：
-            State.INITIAL_LOCATE: 初始定位完成后，进行常规飞镖获取
-            State.ATTACK: 攻击完成后，检查是否还有常规飞镖未获取，若有则继续获取
-            State.GO_DART: 上一个常规飞镖获取失败，尝试下一个位置
-            """
-            if dart1_num <= 0:
-                print("[INFO] 常规飞镖已全部获取")
-                last_state = state
-                state = State.GO_DART2
-                continue
-            dart1 = goal["dart1"]
-            first_one_index = None
-            for i, value in enumerate(dart1_pos):
-                if value == 1:
-                    first_one_index = i
-                    break
-            if first_one_index is None:
-                print("[INFO] 所有飞镖靶均已击中")
-                last_state = state
-                state = State.GO_DART2
-                continue
-            dart1[0] += first_one_index * 300  # TODO:每个存飞镖区间隔300mm
-            res = go_to_ack_then_optional_tag_verify(
-                car, dart1, link,
-                pos_tol=50.0, yaw_tol=5.0,
-                move_timeout=6.0, rot_timeout=4.0,
-                verify_window=0.8,
-                max_corrections=1,
-                scan_fn=scan_fn
-            )
-            print("[RESULT]", res)
-            # TODO:找飞镖，拿飞镖
-            dart1_pos[first_one_index] = 0
-            frames = get_frames_burst(mc, "cam1", n=5, timeout_s=1.0, min_gap_ms=100)
-            if find_dart(frames, dart1_roi) == True:
-                print("[INFO] 常规飞镖已找到，在第", first_one_index + 1, "个位置")
-                last_state = state
-                state = State.GRAB
-            else:
-                print("[INFO] 第", first_one_index + 1, "个位置常规飞镖未找到，尝试下一个位置")
-                last_state = state
-                state = State.GO_DART1
-            
-
-        elif state == State.GO_DART2:
-            """
-            上一个状态的可能情况：
-            State.ATTACK: 攻击完成后，检查是否还有常规飞镖未获取，若有则继续获取
-            State.GO_DART1: 常规飞镖已全部获取，进行战略飞镖获取
-            State.GO_DART2: 上一个战略飞镖获取失败，尝试下一个位置
-            """
-            if dart2_num <= 0:
-                print("[INFO] 常规飞镖已全部获取")
-                last_state = state
-                state = State.DONE
-                continue
-            dart2 = goal["dart2"]
-            first_one_index = None
-            for i, value in enumerate(dart2_pos):
-                if value == 1:
-                    first_one_index = i
-                    break
-            if first_one_index is None:
-                print("[INFO] 所有飞镖靶均已击中")
-                last_state = state
-                state = State.DONE
-                continue
-            dart2[1] -= first_one_index * 300  # TODO:每个存飞镖区间隔300mm
-            res = go_to_ack_then_optional_tag_verify(
-                car, dart2, link,
-                pos_tol=50.0, yaw_tol=5.0,
-                move_timeout=6.0, rot_timeout=4.0,
-                verify_window=0.8,
-                max_corrections=1,
-                scan_fn=scan_fn
-            )
-            print("[RESULT]", res)
-            # TODO:找飞镖，拿飞镖
-            dart2_pos[first_one_index] = 0
-            frames = get_frames_burst(mc, "cam1", n=5, timeout_s=1.0, min_gap_ms=100)
-            if find_dart(frames, dart2_roi) == True:
-                print("[INFO] 战略飞镖已找到，在第", first_one_index + 1, "个位置")
-                last_state = state
-                state = State.GRAB
-            else:
-                print("[INFO] 第", first_one_index + 1, "个位置战略飞镖未找到，尝试下一个位置")
-                last_state = state
-                state = State.GO_DART2
-                
-        elif state == State.GRAB:
-            # 若未成功抓取，直接跳过
-            # TODO: 考虑最后重新抓取？如果真有飞镖颜色一样，那得考虑，否则正常情况是能抓取成功
-            if last_state == State.GO_DART1:
-                success = get_dart(link, 0, mc, dart1_roi) # dart1
-                if success:
-                    dart1_num -= 1
-                    print("[INFO] 常规飞镖获取成功，剩余数量:", dart1_num)
-                    last_state = state
-                    state = State.ATTACK
-                else:
-                    print("[ERR] 常规飞镖获取失败，尝试下一个位置")
-                    last_state = state
-                    state = State.GO_DART1
-            elif last_state == State.GO_DART2:
-                success = get_dart(link, 1, mc, dart2_roi) # dart2
-                if success:
-                    dart2_num -= 1
-                    print("[INFO] 战略飞镖获取成功，剩余数量:", dart2_num)
-                    last_state = state
-                    state = State.ATTACK
-                else:
-                    print("[ERR] 战略飞镖获取失败，尝试下一个位置")
-                    last_state = state
-                    state = State.GO_DART2
-
-        elif state == State.ATTACK:
-            # 打击哨所是两次飞镖后就解除无敌，所以可以考虑直接拿飞镖后原地打击？而不是上打击区进行打击
-            if shaobing == True:
-                goal_attack = goal["daji1"]
-                res = go_to_ack_then_optional_tag_verify(
-                    car, goal_attack, link,
-                    pos_tol=50.0, yaw_tol=5.0,
-                    move_timeout=6.0, rot_timeout=4.0,
-                    verify_window=0.8,
-                    max_corrections=1,
-                    scan_fn=scan_fn
-                )
-                print("[RESULT]", res)
-                attack(0, link)
-                time.sleep(1.0)
-                frame = mc.latest("cam0").image
-                shaobing = detect_sb(frame, led_roi, led_hsv_range, debug=True)
-            else:
-                goal_attack = goal["daji2"]
-                res = go_to_ack_then_optional_tag_verify(
-                    car, goal_attack, link,
-                    pos_tol=50.0, yaw_tol=5.0,
-                    move_timeout=6.0, rot_timeout=4.0,
-                    verify_window=0.8,
-                    max_corrections=1,
-                    scan_fn=scan_fn
-                )
-                print("[RESULT]", res)
-                attack(1, link)
-            
-            res1 = 1 if all(x == 0 for x in dart1_pos) else 0
-            res2 = 1 if all(x == 0 for x in dart2_pos) else 0
-            if res1 == 0:
-                last_state = state
-                state = State.GO_DART1
-            elif res2 == 0:
-                last_state = state
-                state = State.GO_DART2
-            else:
-                last_state = state
-                state = State.DONE
-
-        elif state == State.DONE:
-            print("[INFO] 任务完成")
-            break
-
-        elif state == State.FAIL:
-            link.send_stop()
-            print("[ERR] 任务失败")
-            break
-        
-        link.heartbeat(interval_s=0.2, mode="zero")
-        print("[INFO] 上一个状态:", last_state, "当前状态:", state)
 
 # ====== 入口 ======
 if __name__ == "__main__":

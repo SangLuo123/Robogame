@@ -14,16 +14,17 @@ class AsciiProtocol:
     """
     ASCII 帧协议: $<CMD><payload>#
       V: $V<x_mm>,<y_mm>#          (坐标，单位 mm，表示目标相对小车坐标系的位置)
-      S: $S#
-      Q: $Q#
+      S: $S#                       (急停)
+      Q: $Q#                       (查询编码器)
       E: $E<e1>,<e2>,...#          (下位机回复)
       A: $AOK# / $AERR,<code>#     (下位机回复)
       T: (下位机回复，保留)
       F: (下位机回复，保留)
-      P: $P<rpm>#
-      T: $T#                        (触发发射)
-      C: $C<name>#                  (机械臂预设动作)
-      R: $R<yaw_deg>#               (旋转角度)
+      P: $P<rpm>#                  (设置发射器转速)
+      T: $T#                       (触发发射)
+      C: $C<name>#                 (机械臂预设动作)
+      R: $R<yaw_deg>#              (旋转角度)
+      H: $H#                       (心跳)
     """
 
     # ---- 组包 ----
@@ -61,6 +62,10 @@ class AsciiProtocol:
     def build_rotate(yaw_deg: float) -> bytes:
         # 默认逆时针？
         return AsciiProtocol.build("R", [f"{yaw_deg:.2f}"])
+
+    @staticmethod
+    def build_heartbeat() -> bytes:
+        return AsciiProtocol.build("H")
 
     # ---- 流式解析（状态机）----
     def __init__(self):
@@ -186,6 +191,10 @@ class SerialLink:
     def rotate(self, yaw_deg: float):
         """旋转：$Ryaw_deg#"""
         self._send_bytes(self.proto.build_rotate(yaw_deg))
+        
+    def send_heartbeat(self):
+        """心跳：$H#"""
+        self._send_bytes(self.proto.build_heartbeat())
 
     # ---------- 接收线程 ----------
     def _rx_loop(self):
@@ -235,17 +244,11 @@ class SerialLink:
                 time.sleep(0.05)
 
     # ---------- 心跳（主循环兜底） ----------
-    def heartbeat(self, interval_s: float = 0.2, mode: str = "zero"):
+    def heartbeat(self, interval_s: float = 0.2):
         """
         在你的主控制循环里周期调用：
-          - 若 interval_s 内未发送任何帧，则自动发送一条保活速度
-          - mode == "zero": 发送 $V0,0#
-          - mode == "last": 重发上一条 $Vx,y#
+          - 若 interval_s 内未发送任何帧，则自动发送一条保活心跳 $H#
         """
         now = time.time()
         if now - self.last_tx_time > interval_s:
-            if mode == "zero":
-                x, y = 0.0, 0.0
-            else:
-                x, y = self._last_cmd_xy
-            self.send_vel_xy(x, y)
+            self.send_heartbeat()
