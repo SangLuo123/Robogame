@@ -382,37 +382,57 @@ def main():
     car.set_camera_extrinsic("cam1", T_robot_cam_1)
     link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"])
     link.open()
-    start_heartbeat(link, interval=0.2) # 启动心跳线程
+    # start_heartbeat(link, interval=0.2) # 启动心跳线程
 
-    # cap = open_camera(cfg["camera_index"])
-    state = State.INIT
-    goal = cfg["goal"]
+    # # cap = open_camera(cfg["camera_index"])
+    # state = State.INIT
+    # goal = cfg["goal"]
 
-    print("[INFO] 启动完成，进入主循环… 按 ESC 退出。")
+    # print("[INFO] 启动完成，进入主循环… 按 ESC 退出。")
 
-    mc = MultiCam()
-    backend = cv2.CAP_DSHOW  # Windows使用DirectShow后端 # linux上直接使用默认赋值即可
-    mc.add_camera("cam0", 0,   width=640, height=480, fourcc="MJPG", backend=backend)
-    mc.add_camera("cam1", 2, width=640, height=480, fourcc="MJPG", backend=backend)
-    mc.start()
+    # mc = MultiCam()
+    # backend = cv2.CAP_DSHOW  # Windows使用DirectShow后端 # linux上直接使用默认赋值即可
+    # mc.add_camera("cam0", 0,   width=640, height=480, fourcc="MJPG", backend=backend)
+    # mc.add_camera("cam1", 2, width=640, height=480, fourcc="MJPG", backend=backend)
+    # mc.start()
     
-    # TODO: 数据待更新
-    state = State.INIT_CHECKS
-    dart1_pos = [1, 1, 1, 1, 1]
-    dart2_pos = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    shaobing = True
-    scan_fn = lambda: get_tags(mc, det0, det1, car)
-    dart1_roi = cfg["dart1_roi"] # TODO: 待更新
-    dart2_roi = cfg["dart2_roi"] # TODO: 待更新
-    dart1_num = 3
-    dart2_num = 5
-    attach_callbacks(link)
-    led_roi = cfg["led_roi"]
-    last_state = None # TODO: 待更新
-    led_hsv_range = cfg["led_hsv_range"] # TODO: 待更新
+    # # TODO: 数据待更新
+    # state = State.INIT_CHECKS
+    # dart1_pos = [1, 1, 1, 1, 1]
+    # dart2_pos = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    # shaobing = True
+    # scan_fn = lambda: get_tags(mc, det0, det1, car)
+    # dart1_roi = cfg["dart1_roi"] # TODO: 待更新
+    # dart2_roi = cfg["dart2_roi"] # TODO: 待更新
+    # dart1_num = 3
+    # dart2_num = 5
+    # attach_callbacks(link)
+    # led_roi = cfg["led_roi"]
+    # last_state = None # TODO: 待更新
+    # led_hsv_range = cfg["led_hsv_range"] # TODO: 待更新
     
-    wait_ready(mc, ["cam0", "cam1"], timeout_s=3.0)
-    print("[INFO] 两路相机已就绪")
+    # wait_ready(mc, ["cam0", "cam1"], timeout_s=3.0)
+    # print("[INFO] 两路相机已就绪")
+    # link._send_bytes(b'$T#')
+    
+    link.send_vel_xy(500, 150)
+    time.sleep(1)
+    link.send_stop()
+    time.sleep(1)
+    link.query_encoders()
+    time.sleep(1)
+    link.send_shooter_rpm(1500)
+    time.sleep(1)
+    link.shooter_fire()
+    time.sleep(1)
+    link.arm_preset("GRAB")
+    time.sleep(1)
+    link.rotate(90)
+    time.sleep(1)
+    link.send_heartbeat()
+    print("测试旋转90度并等待ACK...")
+    res = _send_rot_and_wait_ack(link, 90, timeout_s=15.0)
+    print(res)
     
 
 

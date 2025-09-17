@@ -29,10 +29,27 @@ class AsciiProtocol:
 
     # ---- 组包 ----
     @staticmethod
+    def crc16_ccitt(data: bytes, poly: int = 0x1021, init: int = 0xFFFF) -> int:
+        """CRC-16-CCITT 算法"""
+        crc = init
+        for b in data:
+            crc ^= (b << 8)
+            for _ in range(8):
+                if (crc & 0x8000) != 0:
+                    crc = (crc << 1) ^ poly
+                else:
+                    crc <<= 1
+                crc &= 0xFFFF
+        return crc
+    
+    @staticmethod
     def build(cmd: str, fields: List[str] | None = None) -> bytes:
         assert len(cmd) == 1, "CMD 必须是单字符"
         payload = cmd if not fields else (cmd + ",".join(fields))
-        return b"$" + payload.encode("ascii") + b"#"
+        core = b"$" + payload.encode("ascii")
+        crc = crc16_ccitt(core)
+        msg = core + crc.to_bytes(2, 'big') + b"#"
+        return msg
 
     @staticmethod
     def build_vel_xy(x: float, y: float) -> bytes:
@@ -156,11 +173,53 @@ class SerialLink:
         return self.ser is not None and self.ser.is_open
 
     # ---------- 发送 ----------
-    def _send_bytes(self, b: bytes):
-        if not self.is_open():
-            return
-        self.ser.write(b)
-        self.last_tx_time = time.time()
+    def _send_bytes(self, msg: bytes, timeout=0.5, retries=3):
+        # TODO: 还是发送失败怎么办
+        """
+        发送 msg（已经包含 CRC 和 '#'），等待 ACK（b'\x06' 或 b'ACK'），超时重发。
+        timeout 单位秒，retries 重试次数（含第一次发送）。
+        返回 True 表示收到 ACK。
+        """
+        ACK_FRAME = b"$ACK#"
+        ERR_FRAME = b"$AERR#"
+        for attempt in range(1, retries+1):
+            # 清空旧输入，避免把之前残留的 ACK 当本次 ACK
+            try:
+                ser.reset_input_buffer()
+            except Exception:
+                # 兼容旧版本 pyserial：手动读干净
+                while ser.in_waiting:
+                    ser.read(ser.in_waiting)
+            ser.write(msg)
+            ser.flush()
+            # 等待 ACK 或 NAK
+            endt = time.time() + timeout
+            buf = b""
+            while time.time() < endt:
+                # 读出所有当前可用字节
+                n = ser.in_waiting
+                if n:
+                    buf += ser.read(n)
+
+                    # 找到明确的成功帧
+                    if ACK_FRAME in buf:
+                        # 可选：把多余的字节消费或记录日志
+                        return True
+
+                    # 找到明确的错误帧（把它视为否定，不再重试）
+                    if ERR_FRAME in buf:
+                        return False
+
+                    # 若协议以后扩展为带序号的 ACK，可在这里解析并对 seq 做匹配
+                time.sleep(0.005)
+
+            # 本次 attempt 超时且未收到 ACK/ERR，准备重试（如果还有重试机会）
+            # 为避免紧连着重发导致下位机压力，短暂等待
+            time.sleep(0.01)
+        # if not self.is_open():
+        #     return
+        # self.ser.write(b)
+        # self.last_tx_time = time.time()
 
     def send_vel_xy(self, x: float, y: float):
         # 单位：mm，正前方为x，正左方为y

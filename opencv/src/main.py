@@ -30,6 +30,35 @@ class State:
 
 # ========== 可按需实现/替换的占位函数 ==========
 
+def get_tags(mc, det0, det1, car):
+    # 什么时候更新位姿？
+    # init_locate：刚开始更新位姿
+    # 每次移动结束会更新
+    # TODO: 下楼梯需不需要用到？
+    # 需不需要考虑车的z坐标？感觉应该不用考虑，不考虑唯一有问题的是斜着，即上下楼梯时的位姿，但上下楼梯不需要测算位姿，
+    # 故直接不考虑z坐标，将小车中心定位小车底座中心对应的地面
+    pair = mc.get_pair_synced("cam0","cam1", max_skew_ms=60, timeout_ms=300)
+    if pair is None:
+        return None
+    p0, p1 = pair
+    raw0, raw1 = p0.image, p1.image
+
+    tags0 = det0.detect_tags(raw0, estimate_pose=True) or []
+    tags1 = det1.detect_tags(raw1, estimate_pose=True) or []
+    
+    all_tags = [(t, "cam0") for t in tags0] + [(t, "cam1") for t in tags1]
+
+    if not all_tags:
+        return None
+    
+    det, cam_id = min(
+        all_tags,
+        key=lambda x: float(np.linalg.norm(np.array(x[0]["pose_t"]).reshape(3)))
+    )
+    
+    car.update_pose_from_tag(det, cam_id=cam_id)
+    return {"best_cam": cam_id, "best_tag": det}
+
 def choose_best_tag(detections):
     """
     从 Detector.detect_tags() 的结果里选一个最靠谱的。
@@ -90,37 +119,39 @@ def main():
     tag_map = build_tag_map(cfg) # tag_map
 
     # 3) 模块初始化
-    det0 = Detector(
-        camera_matrix=K0,
-        dist_coeffs=dist0,
-        tag_size=cfg["tag_size"],
-        hsv_params=cfg["hsv_range"]
-    )
-    det1 = Detector(
-        camera_matrix=K1,
-        dist_coeffs=dist1,
-        tag_size=cfg["tag_size"],
-        hsv_params=cfg["hsv_range"]
-    )
     car = RobotCar(tag_map)
     car.set_camera_extrinsic("cam0", T_robot_cam_0)
     car.set_camera_extrinsic("cam1", T_robot_cam_1)
-    # link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"], binary=True)
-    # link.open()
+    link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"])
+    link.open()
 
     # cap = open_camera(cfg["camera_index"])
     state = State.INIT
     goal = cfg["goal"]
-    kv, ktheta = cfg["kv"], cfg["ktheta"]
 
     print("[INFO] 启动完成，进入主循环… 按 ESC 退出。")
-    t0 = time.time()
 
     mc = MultiCam()
+    w = 640
+    h = 480
+    print("[INFO] 读取相机标定参数完成, 值为：", K0, dist0, K1, dist1)
+    mapx0, mapy0, newK0 = _CamWorker.build_undistort_maps(K0, dist0, (w, h))
+    mapx1, mapy1, newK1 = _CamWorker.build_undistort_maps(K1, dist1, (w, h))
+    print("[INFO] 畸变校正映射计算完成, 值为：", newK0, newK1)
     backend = cv2.CAP_DSHOW  # Windows使用DirectShow后端 # linux上直接使用默认赋值即可
     mc.add_camera("cam0", 0,   width=640, height=480, fourcc="MJPG", backend=backend)
     mc.add_camera("cam1", 2, width=640, height=480, fourcc="MJPG", backend=backend)
-    mc.start()
+
+    det0 = Detector(
+        camera_matrix=newK0,
+        tag_size=cfg["tag_size"],
+        hsv_params=cfg["hsv_range"]
+    )
+    det1 = Detector(
+        camera_matrix=newK1,
+        tag_size=cfg["tag_size"],
+        hsv_params=cfg["hsv_range"]
+    )
     
 
     try:

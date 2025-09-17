@@ -39,7 +39,14 @@ class _CamWorker:
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._frame_id = 0
         self._ema_fps = 0.0
-
+        
+        self.newK = None
+        if undistort_maps is not None:
+            if len(undistort_maps) == 3:
+                self.undistort_maps = (undistort_maps[0], undistort_maps[1])
+                self.newK = undistort_maps[2]
+            else:
+                self.undistort_maps = undistort_maps
     def start(self):
         self._thread.start()
         return self
@@ -132,7 +139,7 @@ class _CamWorker:
         w, h = size
         newK, _ = cv2.getOptimalNewCameraMatrix(K, dist, (w, h), 0)
         mapx, mapy = cv2.initUndistortRectifyMap(K, dist, None, newK, (w, h), cv2.CV_32FC1)
-        return mapx, mapy
+        return mapx, mapy, newK
 
 
 class MultiCam:

@@ -1,5 +1,5 @@
 {
-    "serial_port": "/dev/ttlUSB0",
+    "serial_port": "/dev/ttyUSB0",
     "baud": 115200,
     "tag_size": 120,
     "cameras": [
@@ -215,6 +215,11 @@
         }
     },
     "goal": {
+        "init_locate": [
+            2100,
+            2500,
+            90
+        ],
         "dart1": [
             2100,
             4400,
@@ -225,15 +230,10 @@
             4400,
             0
         ],
-        "daji1": [
+        "daji": [
             600,
             4400,
-            0
-        ],
-        "daji2": [
-            600,
-            4400,
-            90
+            180
         ]
     },
     "sync": {
