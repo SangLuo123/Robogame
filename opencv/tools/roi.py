@@ -12,6 +12,8 @@ if ROOT not in sys.path:
 def select_roi_interactive(image_path):
     # 读取图像
     img = cv2.imread(image_path)
+    if img is None:
+        raise FileNotFoundError(f"Image not found at {image_path}")
     img_copy = img.copy()
     
     # 选择矩形 ROI
@@ -27,6 +29,6 @@ def select_roi_interactive(image_path):
     
     return roi_rect
 
-img_path = "./img/1.png"
+img_path = os.path.join(ROOT, "tools/img", "1.png")
 roi_rect = select_roi_interactive(img_path)
 print(f"ROI矩形坐标: {roi_rect}")  # (x, y, width, height)

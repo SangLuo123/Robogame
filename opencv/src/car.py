@@ -37,7 +37,7 @@ class RobotCar:
         elif cam_id is not None and str(cam_id) in self.T_robot_cam_for:
             T_rc = self.T_robot_cam_for[str(cam_id)]
         else:
-            T_rc = None
+            raise ValueError("必须提供 cam_id 或 T_robot_cam")
         
         T_world_tag = self.tag_map[det["tag_id"]]
         T_cam_tag = rt_to_T(det["pose_R"], det["pose_t"])

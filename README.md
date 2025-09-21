@@ -2,6 +2,9 @@
 This project is used for USTC Robogame2025.
 ## Files
 ```
+流程/
+├── 比赛流程.drawio         --比赛流程
+├── 点位.md                 --一些移动的点位
 opencv/
 ├── calib/
 | ├── imgdown/              --标定旧相机用的图片
@@ -14,6 +17,7 @@ opencv/
 | └── undistort.py          --测试去畸变后的相机
 ├── data/
 | ├── config.json           --配置参数
+| ├── config1.json          --以一个相机为中心配置参数
 | ├── hsv_range.json        --飞镖的HSV参数
 | ├── tips.md               --注意事项
 ├── img/                    --图片
@@ -28,17 +32,24 @@ opencv/
 | ├── car.py                --小车的类
 | ├── comm.py               --与下位机交流的类以及通信协议
 | ├── demo_twocam.py        --测试两个相机
-| ├── detect_dart.py       --根据传入的ROI自动分析飞镖的HSV范围并计算ROI中目标飞镖的面积占比决定是否有飞镖
+| ├── detect_dart.py        --根据传入的ROI自动分析飞镖的HSV范围并计算ROI中目标飞镖的面积占比决定是否有飞镖
 | ├── detector.py           --检测器的类
-| ├── host_main.py          --测试通信
 | ├── load.py               --加载配置的函数
-| ├── main.py               --两个相机主函数
-| ├── main1.py              --一个相机主函数
-| ├── main2.py              --暂时的主流程函数
-| ├── main3.py              --一个相机主函数，但是使用更新后的car和multicam
+| ├── main1.py              --主流程函数
+| ├── main2.py              --三审2分流程
+| ├── main3.py              --以一个相机为中心三审2分流程x
+| ├── main4.py              --以一个相机为中心
+| ├── main5.py              --只开一个相机，三审，全新流程，飞镖贴tag
+| ├── main7.py              --只开一个相机，三审，拿全部常规
+| ├── main8.py              --只开一个相机，三审，新流程
 | ├── multicam.py           --多相机管理函数
-| ├── test_main             --测试主函数
-| └── transform.py          --坐标变换时用到的一些矩阵相关的函数
+| ├── one_cam_tag.py        --一个相机测试主函数
+| ├── simu_stm32.py         --模拟stm32进行通信
+| ├── test_main.py          --测试通信
+| ├── test.py               --测试通信
+| ├── TODO.md               --测试待完成事项
+| ├── transform.py          --坐标变换时用到的一些矩阵相关的函数
+| └── two_cam_tag.py        --两个相机测试主函数
 ├── tools/      
 | ├── img/                  --临时图片        
 | ├── find_obj.py           --使用掩码识别飞镖

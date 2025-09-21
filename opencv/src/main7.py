@@ -52,69 +52,32 @@ def wait_ready(mc, names, timeout_s=3.0):
             print(f"[ERR] {n} no frame within {timeout_s}s")
     return False
 
-def get_tags(mc, det0, det1, car):
+def get_tags(mc, det1, car):
     # 什么时候更新位姿？
     # init_locate：刚开始更新位姿
     # 每次移动结束会更新
     # TODO: 下楼梯需不需要用到？
     # 需不需要考虑车的z坐标？感觉应该不用考虑，不考虑唯一有问题的是斜着，即上下楼梯时的位姿，但上下楼梯不需要测算位姿，
     # 故直接不考虑z坐标，将小车中心定位小车底座中心对应的地面
-    pair = mc.get_pair_synced("cam0","cam1", max_skew_ms=60, timeout_ms=300)
-    if pair is None:
-        return None
-    p0, p1 = pair
-    raw0, raw1 = p0.image, p1.image
+    pkt0 = mc.latest("cam1")
+    pkt0 = pkt0.image
 
-    tags0 = det0.detect_tags(raw0, estimate_pose=True) or []
-    tags1 = det1.detect_tags(raw1, estimate_pose=True) or []
+    tags1 = det1.detect_tags(pkt0, estimate_pose=True) or []
     
-    DISTANCE_THRESHOLD = 3500
-
-    # 优先选择cam1的tag
-    if tags1:
-        # 找到cam1中最近的tag
-        closest_tag_cam1 = min(
-            tags1,
-            key=lambda t: float(np.linalg.norm(np.array(t["pose_t"]).reshape(3)))
-        )
-        distance_cam1 = float(np.linalg.norm(np.array(closest_tag_cam1["pose_t"]).reshape(3)))
-        
-        # 如果cam1的tag距离在可接受范围内，优先使用cam1
-        if distance_cam1 <= DISTANCE_THRESHOLD:
-            car.update_pose_from_tag(closest_tag_cam1, cam_id="cam1")
-            return {"best_cam": "cam1", "best_tag": closest_tag_cam1, "distance": distance_cam1}
-        
-        # 如果cam1的tag太远，但有cam0的tag可用，则考虑cam0
-        elif tags0:
-            closest_tag_cam0 = min(
-                tags0,
-                key=lambda t: float(np.linalg.norm(np.array(t["pose_t"]).reshape(3)))
-            )
-            distance_cam0 = float(np.linalg.norm(np.array(closest_tag_cam0["pose_t"]).reshape(3)))
-            
-            # 使用cam0的tag进行定位
-            car.update_pose_from_tag(closest_tag_cam0, cam_id="cam0")
-            return {"best_cam": "cam0", "best_tag": closest_tag_cam0, "distance": distance_cam0}
-        
-        else:
-            # cam1的tag太远，且cam0没有检测到tag
-            car.update_pose_from_tag(closest_tag_cam1, cam_id="cam1")
-            return {"best_cam": "cam1", "best_tag": closest_tag_cam1, "distance": distance_cam1, "warning": "tag_too_far"}
-    
-    # 如果cam1没有检测到tag，但cam0检测到了
-    elif tags0:
-        closest_tag_cam0 = min(
-            tags0,
-            key=lambda t: float(np.linalg.norm(np.array(t["pose_t"]).reshape(3)))
-        )
-        distance_cam0 = float(np.linalg.norm(np.array(closest_tag_cam0["pose_t"]).reshape(3)))
-        
-        car.update_pose_from_tag(closest_tag_cam0, cam_id="cam0")
-        return {"best_cam": "cam0", "best_tag": closest_tag_cam0, "distance": distance_cam0}
-    
-    # 两个相机都没有检测到tag
-    else:
+    if not tags1:
         return None
+
+
+    closest_tag_cam1 = min(
+        tags1,
+        key=lambda t: float(np.linalg.norm(np.array(t["pose_t"]).reshape(3)))
+    )
+    distance_cam1 = float(np.linalg.norm(np.array(closest_tag_cam1["pose_t"]).reshape(3)))
+    
+
+    car.update_pose_from_tag(closest_tag_cam1, cam_id="cam1")
+    return {"best_cam": "cam1", "best_tag": closest_tag_cam1, "distance": distance_cam1}
+        
 
 # ============== 移动相关 ==============
 def attach_callbacks(link: SerialLink):
@@ -151,7 +114,7 @@ class _AckWaiter:
         link.on_enc = _hook
 
     def wait(self, timeout: float):
-        """等待一条 ACK；返回 (ok:bool, fields:list) 或 None(超时)"""
+        """等待一条 ENC；返回 (ok:bool, fields:list) 或 None(超时)"""
         deadline = time.time() + float(timeout)
         with self.cv:
             while True:
@@ -186,6 +149,7 @@ def _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=6.0):
     if ev is None:
         return False, "timeout"
     ok, fields = ev
+    print(f"MOVE ENC: {ok} {' '.join(map(str, fields))}")
     return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
 
 def _send_rot_and_wait_ack(link, d_yaw, timeout_s=4.0):
@@ -195,6 +159,7 @@ def _send_rot_and_wait_ack(link, d_yaw, timeout_s=4.0):
     if ev is None:
         return False, "timeout"
     ok, fields = ev
+    print(f"ROT ENC: {ok} {' '.join(map(str, fields))}")
     return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
 
 def go_to_ack_then_optional_tag_verify(
@@ -329,7 +294,6 @@ def go_to_ack_then_optional_tag_verify(
         else:
             # 看到了 tag，但未达标，发一次纠正
             if corrections >= max_corrections:
-                print("[WARN] Verified not at goal; correction limit reached -> stop.")
                 return {"ok": False, "stage": "verify_fail", "corrections": corrections}
             corrections += 1
             print(f"[INFO] Verified not at goal; send correction #{corrections} ...")
@@ -426,15 +390,15 @@ def attack(target, link):
     # 转速在函数里确认
     if target == 0:
         print("[INFO] 攻击哨兵")
-        link.send_shooter_rpm(120)  # 设置转速
+        link.send_shooter_rpm(1500)  # 设置转速
         # time.sleep(1.0)               # 等待转速稳定
         # link.shooter_fire()           # 触发发射
     elif target == 1:
         print("[INFO] 攻击大本营")
-        link.send_shooter_rpm(150)  # 设置转速
+        link.send_shooter_rpm(2000)  # 设置转速
         # time.sleep(1.0)               # 等待转速稳定
         # link.shooter_fire()           # 触发发射
-
+        
 def get_frames_burst(mc, cam_name, n=5, timeout_s=0.5, min_gap_ms=0):
     """
     从单路相机抓 n 帧（去重），超时返回已抓到的。
@@ -525,27 +489,37 @@ def get_dart(link, dart_id, mc, roi, max_attempts=1):
     print(f"[ERROR] 抓取{dart_name}失败，已尝试{max_attempts}次")
     return False
 
+def start_heartbeat(link, interval=0.2):
+    def run():
+        while True:
+            link.heartbeat(interval_s=interval)
+            time.sleep(interval)
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
 def main():
-    config_path = os.path.join(ROOT, "data", "config1.json")
+    config_path = os.path.join(ROOT, "data", "config.json")
     cfg = load_config(config_path)                     # 可换成 data/config.json
-    calibup_path = os.path.join(ROOT, "calib", "calibup.npz")
+    # calibup_path = os.path.join(ROOT, "calib", "calibup.npz")
     calibdown_path = os.path.join(ROOT, "calib", "calibdown.npz")
 
     # 1) 相机标定参数
-    K0, dist0 = load_calib(calibup_path)        # 你已有的函数，返回 (mtx, dist)
+    # K0, dist0 = load_calib(calibup_path)        # 你已有的函数，返回 (mtx, dist)
     K1, dist1 = load_calib(calibdown_path)      # 你已有的函数，返回 (mtx, dist)
 
     # 2) 组装外参与地图
-    T_robot_cam_0 = build_T_robot_cam(cfg["T_robot_cam_for"]["cam0"])
+    # T_robot_cam_0 = build_T_robot_cam(cfg["T_robot_cam_for"]["cam0"])
     T_robot_cam_1 = build_T_robot_cam(cfg["T_robot_cam_for"]["cam1"])
     tag_map = build_tag_map(cfg) # tag_map
 
     # 3) 模块初始化
     car = RobotCar(tag_map)
-    car.set_camera_extrinsic("cam0", T_robot_cam_0)
+    # car.set_camera_extrinsic("cam0", T_robot_cam_0)
     car.set_camera_extrinsic("cam1", T_robot_cam_1)
-    link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"])
+    # link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"])
+    link = SerialLink(port="/dev/pts/5", baud=cfg["baud"])
     link.open()
+    start_heartbeat(link, interval=0.2) # 启动心跳线程
 
     # cap = open_camera(cfg["camera_index"])
     goal = cfg["goal"]
@@ -555,19 +529,19 @@ def main():
     mc = MultiCam()
     w = 640
     h = 480
-    print("[INFO] 读取相机标定参数完成, 值为：", K0, dist0, K1, dist1)
-    mapx0, mapy0, newK0 = _CamWorker.build_undistort_maps(K0, dist0, (w, h))
+    print("[INFO] 读取相机标定参数完成, 值为：", K1, dist1)
+    # mapx0, mapy0, newK0 = _CamWorker.build_undistort_maps(K0, dist0, (w, h))
     mapx1, mapy1, newK1 = _CamWorker.build_undistort_maps(K1, dist1, (w, h))
-    print("[INFO] 畸变校正映射计算完成, 值为：", newK0, newK1)
+    print("[INFO] 畸变校正映射计算完成, 值为：", newK1)
     # backend = cv2.CAP_DSHOW  # Windows使用DirectShow后端 # linux上直接使用默认赋值即可
-    mc.add_camera("cam0", "/dev/cam_up", width=w, height=h, undistort_maps=(mapx0, mapy0, newK0), fourcc="MJPG")
+    # mc.add_camera("cam0", "/dev/cam_up", width=w, height=h, undistort_maps=(mapx0, mapy0, newK0), fourcc="MJPG")
     mc.add_camera("cam1", "/dev/cam_down", width=w, height=h, undistort_maps=(mapx1, mapy1, newK1), fourcc="MJPG")
     mc.start()
-    det0 = Detector(
-        camera_matrix=newK0,
-        tag_size=cfg["tag_size"],
-        hsv_params=cfg["hsv_range"]
-    )
+    # det0 = Detector(
+    #     camera_matrix=newK0,
+    #     tag_size=cfg["tag_size"],
+    #     hsv_params=cfg["hsv_range"]
+    # )
     det1 = Detector(
         camera_matrix=newK1,
         tag_size=cfg["tag_size"],
@@ -579,7 +553,7 @@ def main():
     dart1_pos = [1, 1, 1, 1, 1]
     dart2_pos = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     sb_hp = 2
-    scan_fn = lambda: get_tags(mc, det0, det1, car)
+    scan_fn = lambda: get_tags(mc, det1, car)
     dart1_roi = cfg["dart1_roi"] # TODO: 待更新
     dart2_roi = cfg["dart2_roi"] # TODO: 待更新
     dart1_num = 3
@@ -590,7 +564,7 @@ def main():
     while True:
         if state == State.INIT_CHECKS:
             # 初始阶段，检测各模块
-            if wait_ready(mc, ["cam0", "cam1"], timeout_s=3.0):
+            if wait_ready(mc, ["cam1"], timeout_s=3.0):
                 print("[INFO] 两路相机已就绪")
                 last_state = state
                 state = State.INITIAL_LOCATE
@@ -601,7 +575,7 @@ def main():
 
         elif state == State.INITIAL_LOCATE:
             # 如果初始位置扫不到tag
-            tag = get_tags(mc, det0, det1, car)
+            tag = get_tags(mc, det1, car)
             if tag is None:
                 # 到一个一定能扫到tag的位置
                 # TODO: 数据更新
@@ -617,7 +591,8 @@ def main():
                 ok, info = _send_rot_and_wait_ack(link, d_yaw)
                 if not ok:
                     print(f"[ERR] MOVE {info}")
-                tag = get_tags(mc, det0, det1, car)
+                print("[INFO] 移动到预设位置，重新尝试定位…")
+                tag = get_tags(mc, det1, car)
             else:
                 goal_init = goal["init_locate"]
                 res = go_to_ack_then_optional_tag_verify(
@@ -645,7 +620,7 @@ def main():
                 print("[INFO] 常规飞镖已全部获取")
                 # TODO: 该情况应该只会在上个状态是打击的情况，不用更新last_state，否则干扰移动
                 # last_state = state
-                state = State.GO_DART2
+                state = State.DONE
                 continue
             dart1 = goal["dart1"]
             first_one_index = None
@@ -657,11 +632,11 @@ def main():
                 print("[INFO] 所有飞镖靶均已击中")
                 # TODO: 如果全部遍历完，dart1_num早为0了，应该不会到这个if？
                 # last_state = state
-                state = State.GO_DART2
+                state = State.DONE
                 continue
             dart1[0] += first_one_index * 230  # TODO:每个存飞镖区间隔300mm
             # 不论上个状态是initial_locate还是attack，移动策略都一样，先平移再旋转，且先x更好
-            if last_state != State.ATTACK and last_state != State.INITIAL_LOCATE:
+            if last_state != State.ATTACK and last_state != State.INITIAL_LOCATE and last_state != State.GO_DART1:
                 print("[WARN] 上一个状态非预期")
                 # TODO:
             res = go_to_ack_then_optional_tag_verify(
@@ -676,6 +651,7 @@ def main():
             print("[RESULT]", res)
             # TODO:找飞镖，拿飞镖
             dart1_pos[first_one_index] = 0
+            print("[INFO] 寻找常规飞镖…")
             frames = get_frames_burst(mc, "cam1", n=5, timeout_s=1.0, min_gap_ms=100)
             if find_dart(frames, dart1_roi) == True:
                 print("[INFO] 常规飞镖已找到，在第", first_one_index + 1, "个位置")
@@ -714,7 +690,7 @@ def main():
                 continue
             dart2[1] -= first_one_index * 400  # TODO:每个存飞镖区间隔300mm
             # 到战略飞镖区的前一个状态只有ATTACK
-            if last_state != State.ATTACK:
+            if last_state != State.ATTACK and last_state != State.GO_DART2:
                 print("[WARN] 上一个状态非预期")
                 # TODO:
             x0, y0, yaw0 = car.get_pose()
@@ -778,83 +754,90 @@ def main():
                     state = State.GO_DART2
 
         elif state == State.ATTACK:
-            # 打击哨所是两次飞镖后就解除无敌，所以可以考虑直接拿飞镖后原地打击？而不是上打击区进行打击
-            if last_state == State.GO_DART1:
-                # 先旋转再平移
-                goal_attack = goal["daji"]
-                res = go_to_ack_then_optional_tag_verify(
-                    car, goal_attack, link,
-                    pos_tol=50.0, yaw_tol=5.0,
-                    move_timeout=6.0, rot_timeout=4.0,
-                    verify_window=0.8,
-                    max_corrections=1,
-                    scan_fn=scan_fn,
-                    strategy="rot_then_move_x_then_y"
-                )
-            else:
-                # 平移，再旋转+平移
-                # 横着平移回dart2初始点位
-                goal_attack1 = goal["dart1"]
-                goal_attack1[2] = 180
-                res = go_to_ack_then_optional_tag_verify(
-                    car, goal_attack1, link,
-                    pos_tol=50.0, yaw_tol=5.0,
-                    move_timeout=6.0, rot_timeout=4.0,
-                    verify_window=0.8,
-                    max_corrections=1,
-                    scan_fn=scan_fn,
-                    strategy="move_y_then_x_then_rot"
-                )
-                goal_attack = goal["daji"]
-                res = go_to_ack_then_optional_tag_verify(
-                    car, goal_attack, link,
-                    pos_tol=50.0, yaw_tol=5.0,
-                    move_timeout=6.0, rot_timeout=4.0,
-                    verify_window=0.8,
-                    max_corrections=1,
-                    scan_fn=scan_fn,
-                    strategy="rot_then_move_x_then_y"
-                )
-            # 判断是否攻打哨兵
+            # # 打击哨所是两次飞镖后就解除无敌，所以可以考虑直接拿飞镖后原地打击？而不是上打击区进行打击
+            # if last_state == State.GO_DART1:
+            #     # 先旋转再平移
+            #     goal_attack = goal["daji"]
+            #     res = go_to_ack_then_optional_tag_verify(
+            #         car, goal_attack, link,
+            #         pos_tol=50.0, yaw_tol=5.0,
+            #         move_timeout=6.0, rot_timeout=4.0,
+            #         verify_window=0.8,
+            #         max_corrections=1,
+            #         scan_fn=scan_fn,
+            #         strategy="rot_then_move_x_then_y"
+            #     )
+            # else:
+            #     # 平移，再旋转+平移
+            #     # 横着平移回dart2初始点位
+            #     goal_attack1 = goal["dart1"]
+            #     goal_attack1[2] = 180
+            #     res = go_to_ack_then_optional_tag_verify(
+            #         car, goal_attack1, link,
+            #         pos_tol=50.0, yaw_tol=5.0,
+            #         move_timeout=6.0, rot_timeout=4.0,
+            #         verify_window=0.8,
+            #         max_corrections=1,
+            #         scan_fn=scan_fn,
+            #         strategy="move_y_then_x_then_rot"
+            #     )
+            #     goal_attack = goal["daji"]
+            #     res = go_to_ack_then_optional_tag_verify(
+            #         car, goal_attack, link,
+            #         pos_tol=50.0, yaw_tol=5.0,
+            #         move_timeout=6.0, rot_timeout=4.0,
+            #         verify_window=0.8,
+            #         max_corrections=1,
+            #         scan_fn=scan_fn,
+            #         strategy="rot_then_move_x_then_y"
+            #     )
+            # # 判断是否攻打哨兵
             
-            if sb_hp > 0:
-                attack(0, link) # 攻击哨兵
-                print("[INFO] 哨兵已攻击，检测指示灯状态")
-                # 哨兵检测得更新
-                time.sleep(1.0)
+            # if sb_hp > 0:
+            #     attack(0, link) # 攻击哨兵
+            #     print("[INFO] 哨兵已攻击，检测指示灯状态")
+            #     # 哨兵检测得更新
+            #     time.sleep(1.0)
                        
-                is_hit = detect_sb(mc, "cam0", led_roi)
-                if is_hit:
-                    sb_hp -= 1
-                    print("[INFO] 哨所指示灯已变色，哨兵血量剩余:", sb_hp)
-            else:
-                # 打大本营
-                x0, y0, yaw0 = car.get_pose()
-                goal_sb = (x0, y0, 135) # TODO: 角度待更新
-                res = go_to_ack_then_optional_tag_verify(
-                    car, goal_sb, link,
-                    pos_tol=50.0, yaw_tol=5.0,
-                    move_timeout=6.0, rot_timeout=4.0,
-                    verify_window=0.8,
-                    max_corrections=1,
-                    scan_fn=scan_fn,
-                    strategy="rot_then_move_x_then_y"
-                )
-                attack(1, link) # 攻击大本营
-                print("[INFO] 大本营已攻击")
+            #     is_hit = detect_sb(mc, "cam0", led_roi)
+            #     if is_hit:
+            #         sb_hp -= 1
+            #         print("[INFO] 哨所指示灯已变色，哨兵血量剩余:", sb_hp)
+            # else:
+            #     # 打大本营
+            #     x0, y0, yaw0 = car.get_pose()
+            #     goal_sb = (x0, y0, 135) # TODO: 角度待更新
+            #     res = go_to_ack_then_optional_tag_verify(
+            #         car, goal_sb, link,
+            #         pos_tol=50.0, yaw_tol=5.0,
+            #         move_timeout=6.0, rot_timeout=4.0,
+            #         verify_window=0.8,
+            #         max_corrections=1,
+            #         scan_fn=scan_fn,
+            #         strategy="rot_then_move_x_then_y"
+            #     )
+            #     attack(1, link) # 攻击大本营
+            #     print("[INFO] 大本营已攻击")
                 
-            # 下面这部分是判断下个状态的代码，但貌似没用，直接跳转到GO_DART1即可，若dart1没飞镖会直接跳到GO_DART2，若dart2也没飞镖会直接跳到DONE
-            res1 = 1 if all(x == 0 for x in dart1_pos) else 0
-            res2 = 1 if all(x == 0 for x in dart2_pos) else 0
-            if res1 == 0:
-                last_state = state
-                state = State.GO_DART1
-            elif res2 == 0:
-                last_state = state
-                state = State.GO_DART2
-            else:
-                last_state = state
-                state = State.DONE
+            # # 下面这部分是判断下个状态的代码，但貌似没用，直接跳转到GO_DART1即可，若dart1没飞镖会直接跳到GO_DART2，若dart2也没飞镖会直接跳到DONE
+            # res1 = 1 if all(x == 0 for x in dart1_pos) else 0
+            # res2 = 1 if all(x == 0 for x in dart2_pos) else 0
+            # if res1 == 0:
+            #     last_state = state
+            #     state = State.GO_DART1
+            # elif res2 == 0:
+            #     last_state = state
+            #     state = State.GO_DART2
+            # else:
+            #     last_state = state
+            #     state = State.DONE
+            
+            link.rotate(90)
+            attack(0, link)
+            print("[INFO] 已攻击")
+            
+            last_state = state
+            state = State.GO_DART1
 
         elif state == State.DONE:
             print("[INFO] 任务完成")

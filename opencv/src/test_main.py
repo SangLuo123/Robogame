@@ -1,4 +1,3 @@
-# src/main.py
 import os
 import sys
 import time
@@ -7,6 +6,7 @@ import math
 import numpy as np
 import cv2
 import threading
+from enum import Enum, auto
 
 # --- 保证能导入 src/ 与 package/ ---
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -18,28 +18,20 @@ from src.detector import Detector
 from src.comm import SerialLink
 from src.load import load_calib, load_config
 from src.transform import build_T_robot_cam, build_tag_map
-from src.multicam import MultiCam
+from src.multicam import MultiCam, _CamWorker
 from src.detect_dart import find_dart
 
 # ========== 任务状态机 ==========
 
-class State:
-    INIT_CHECKS = 0
-    INITIAL_LOCATE = 1
-    GO_DART1 = 2
-    GO_DART2 = 3
-    ATTACK = 4
-    DONE = 5
-    FAIL = 6
-    GRAB = 7
-    
-def start_heartbeat(link, interval=0.2):
-    def run():
-        while True:
-            link.heartbeat(interval_s=interval)
-            time.sleep(interval)
-    t = threading.Thread(target=run, daemon=True)
-    t.start()
+class State(Enum):
+    INIT_CHECKS = auto()
+    INITIAL_LOCATE = auto()
+    GO_DART1 = auto()
+    GO_DART2 = auto()
+    ATTACK = auto()
+    DONE = auto()
+    FAIL = auto()
+    GRAB = auto()
 
 # ========== 一些函数 ==========
 
@@ -60,6 +52,12 @@ def wait_ready(mc, names, timeout_s=3.0):
     return False
 
 def get_tags(mc, det0, det1, car):
+    # 什么时候更新位姿？
+    # init_locate：刚开始更新位姿
+    # 每次移动结束会更新
+    # TODO: 下楼梯需不需要用到？
+    # 需不需要考虑车的z坐标？感觉应该不用考虑，不考虑唯一有问题的是斜着，即上下楼梯时的位姿，但上下楼梯不需要测算位姿，
+    # 故直接不考虑z坐标，将小车中心定位小车底座中心对应的地面
     pair = mc.get_pair_synced("cam0","cam1", max_skew_ms=60, timeout_ms=300)
     if pair is None:
         return None
@@ -80,12 +78,14 @@ def get_tags(mc, det0, det1, car):
     )
     
     car.update_pose_from_tag(det, cam_id=cam_id)
+    x0, y0, yaw0 = car.get_pose()
+    print(f"[INFO] 通过 {cam_id} 识别到标签 {det['tag_id']}，更新位姿为 x={x0:.1f} mm, y={y0:.1f} mm, yaw={yaw0:.1f}°")
     return {"best_cam": cam_id, "best_tag": det}
 
 # ============== 移动相关 ==============
 def attach_callbacks(link: SerialLink):
     link.on_ack   = lambda ok, f: print("ACK:", "OK" if ok else f)
-    link.on_enc   = lambda enc:  print("ENC:", enc)
+    link.on_enc   = lambda ok, f:  print("ENC:", "OK" if ok else f)
     link.on_text  = lambda s:    print("TXT:", s)
     link.on_fault = lambda fs:   print("FAULT:", fs)
     
@@ -100,7 +100,7 @@ class _AckWaiter:
         self.cv = threading.Condition()
         self.queue = []
 
-        self._old_on_ack = link.on_ack  # 可能是 None（比如绑定了日志）
+        self._old_on_enc = link.on_enc  # 可能是 None（比如绑定了日志）
 
         def _hook(ok, fields):
             # 入队并唤醒等待者
@@ -108,13 +108,13 @@ class _AckWaiter:
                 self.queue.append((ok, fields))
                 self.cv.notify_all()
             # 级联旧回调
-            if self._old_on_ack:
+            if self._old_on_enc:
                 try:
-                    self._old_on_ack(ok, fields)
+                    self._old_on_enc(ok, fields)
                 except Exception:
                     pass
-
-        link.on_ack = _hook
+# $EOK#    $EERR# 
+        link.on_enc = _hook
 
     def wait(self, timeout: float):
         """等待一条 ACK；返回 (ok:bool, fields:list) 或 None(超时)"""
@@ -134,6 +134,7 @@ def _wrap_deg(a):
     return a
 
 def _world_vec_to_body(dx_w, dy_w, yaw_deg):
+    # TODO: 逻辑？
     """
     把世界系位移向量 [dx_w, dy_w] 旋转到车体系（以当前车头方向为 x 正，左为 y 正）
     等价于 R(-yaw) * [dx_w, dy_w]
@@ -151,6 +152,7 @@ def _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=6.0):
     if ev is None:
         return False, "timeout"
     ok, fields = ev
+    print("ENC fields:", fields)
     return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
 
 def _send_rot_and_wait_ack(link, d_yaw, timeout_s=4.0):
@@ -160,6 +162,7 @@ def _send_rot_and_wait_ack(link, d_yaw, timeout_s=4.0):
     if ev is None:
         return False, "timeout"
     ok, fields = ev
+    print("ENC fields:", fields)
     return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
 
 def go_to_ack_then_optional_tag_verify(
@@ -169,13 +172,24 @@ def go_to_ack_then_optional_tag_verify(
     move_timeout=6.0,
     rot_timeout=4.0,
     verify_window=0.8,    # DONE 后给这段时间扫描 tag
-    max_corrections=2,    # 校验失败允许的纠正次数
-    scan_fn=None          # e.g. lambda: get_tags(mc, det0, det1, car)
+    max_corrections=1,    # 校验失败允许的纠正次数
+    scan_fn=None,         # e.g. lambda: get_tags(mc, det0, det1, car)
+    strategy="move_direct_then_rot" # 默认策略
 ):
     """
     1) 计算相对车体 (dx_b,dy_b,d_yaw)，依次发送 MOVE / ROT，并等待各自 ACK
     2) 完成后尝试扫 tag：若能看到就用 car.get_pose() 与 goal 比较，达标 -> 结束；未达标 -> 再发一次移动
     3) 若扫不到 tag，则直接接受 DONE
+    """
+    """
+    strategy 可选值：
+      - "rot_then_move_direct"  : 先旋转，再一次性平移(dx, dy)
+      - "rot_then_move_x_then_y": 先旋转，再平移x，再平移y
+      - "rot_then_move_y_then_x": 先旋转，再平移y，再平移x
+      - "move_direct_then_rot"  : 一次性平移(dx, dy)，最后旋转
+      - "move_x_then_y_then_rot": 先平移x，再平移y，最后旋转
+      - "move_y_then_x_then_rot": 先平移y，再平移x，最后旋转
+    这里的dx和dy均为车体系
     """
     def _rel_from_world():
         x0, y0, yaw0 = car.get_pose()          # 世界系 mm / deg
@@ -215,19 +229,77 @@ def go_to_ack_then_optional_tag_verify(
         dx_b, dy_b, d_yaw = _rel_from_world()
         print(f"[CMD] rel: dx={dx_b:.1f} mm, dy={dy_b:.1f} mm, dyaw={d_yaw:.1f}°")
 
-        # 1) 平移并等 ACK
-        ok, info = _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=move_timeout)
-        if not ok:
-            print(f"[ERR] MOVE {info}")
-            return {"ok": False, "stage": "move", "info": info}
+        # === 根据 strategy 执行 ===
+        if strategy == "rot_then_move_direct":
+            if abs(d_yaw) > 1.0:
+                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+                if not ok: return {"ok": False, "stage": "rot", "info": info}
+            if abs(dx_b) <= 1.0:
+                dx_b = 0.0
+            if abs(dy_b) <= 1.0:
+                dy_b = 0.0
+            ok, info = _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=move_timeout)
+            if not ok: return {"ok": False, "stage": "move", "info": info}
 
-        # 2) 旋转并等 ACK
-        ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
-        if not ok:
-            print(f"[ERR] ROT {info}")
-            return {"ok": False, "stage": "rot", "info": info}
+        elif strategy == "rot_then_move_x_then_y":
+            if abs(d_yaw) > 1.0:
+                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+                if not ok: return {"ok": False, "stage": "rot", "info": info}
+            if abs(dx_b) > 1.0:
+                ok, info = _send_move_and_wait_ack(link, dx_b, 0, timeout_s=move_timeout)
+                if not ok: return {"ok": False, "stage": "move_x", "info": info}
+            if abs(dy_b) > 1.0:
+                ok, info = _send_move_and_wait_ack(link, 0, dy_b, timeout_s=move_timeout)
+                if not ok: return {"ok": False, "stage": "move_y", "info": info}
 
-        # 3) DONE 后尝试 tag 校验
+        elif strategy == "rot_then_move_y_then_x":
+            if abs(d_yaw) > 1.0:
+                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+                if not ok: return {"ok": False, "stage": "rot", "info": info}
+            if abs(dy_b) > 1.0:
+                ok, info = _send_move_and_wait_ack(link, 0, dy_b, timeout_s=move_timeout)
+                if not ok: return {"ok": False, "stage": "move_y", "info": info}
+            if abs(dx_b) > 1.0:
+                ok, info = _send_move_and_wait_ack(link, dx_b, 0, timeout_s=move_timeout)
+                if not ok: return {"ok": False, "stage": "move_x", "info": info}
+
+        elif strategy == "move_direct_then_rot":
+            if abs(dx_b) <= 1.0:
+                dx_b = 0.0
+            if abs(dy_b) <= 1.0:
+                dy_b = 0.0
+            ok, info = _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=move_timeout)
+            if not ok: return {"ok": False, "stage": "move", "info": info}
+            if abs(d_yaw) > 1.0:
+                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+                if not ok: return {"ok": False, "stage": "rot", "info": info}
+
+        elif strategy == "move_x_then_y_then_rot":
+            if abs(dx_b) > 1.0:
+                ok, info = _send_move_and_wait_ack(link, dx_b, 0, timeout_s=move_timeout)
+                if not ok: return {"ok": False, "stage": "move_x", "info": info}
+            if abs(dy_b) > 1.0:
+                ok, info = _send_move_and_wait_ack(link, 0, dy_b, timeout_s=move_timeout)
+                if not ok: return {"ok": False, "stage": "move_y", "info": info}
+            if abs(d_yaw) > 1.0:
+                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+                if not ok: return {"ok": False, "stage": "rot", "info": info}
+
+        elif strategy == "move_y_then_x_then_rot":
+            if abs(dy_b) > 1.0:
+                ok, info = _send_move_and_wait_ack(link, 0, dy_b, timeout_s=move_timeout)
+                if not ok: return {"ok": False, "stage": "move_y", "info": info}
+            if abs(dx_b) > 1.0:
+                ok, info = _send_move_and_wait_ack(link, dx_b, 0, timeout_s=move_timeout)
+                if not ok: return {"ok": False, "stage": "move_x", "info": info}
+            if abs(d_yaw) > 1.0:
+                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+                if not ok: return {"ok": False, "stage": "rot", "info": info}
+
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+
+        # DONE 后尝试 tag 校验
         verdict = _try_verify_once()
         if verdict is None:
             # 没看到 tag：按你的策略，直接接受
@@ -239,58 +311,110 @@ def go_to_ack_then_optional_tag_verify(
         else:
             # 看到了 tag，但未达标，发一次纠正
             if corrections >= max_corrections:
-                print("[WARN] Verified not at goal; correction limit reached -> stop.")
                 return {"ok": False, "stage": "verify_fail", "corrections": corrections}
             corrections += 1
             print(f"[INFO] Verified not at goal; send correction #{corrections} ...")
             # while 循环继续，重新计算相对量并重发
 
-def detect_sb(frame, roi, hsv_range, thresh=0.4, debug=False):
+def detect_sb(mc, camera_name="cam0", roi=None, flash_duration=5, flashes_per_sec=3):
     """
-    判断哨所指示灯是否已变色
-    参数:
-        frame: 输入帧 (BGR)
-        roi: (x, y, w, h) ROI区域
-        hsv_range: {"lower": [H,S,V], "upper": [H,S,V]} 目标颜色范围
-        thresh: 判断阈值 (0~1)，ROI 区域内目标颜色像素比例超过此值判定为已变色
-        debug: 是否显示调试窗口
-    返回:
-        bool: False=已变色（即哨所失效）, True=未变色
-        float: 实际占比
+    检测哨所当前是否被打击一次（即闪烁模式：1s内闪烁三下，共5s）。
+    
+    :param mc: MultiCam实例，多摄像头管理器
+    :param camera_name: 摄像头名称，默认为"cam0"
+    :param roi: 灯的感兴趣区域 (tuple: (x, y, w, h))
+    :param flash_duration: 闪烁总时长 (s)
+    :param flashes_per_sec: 1s内闪烁次数
+    :return: bool - 是否检测到一次完整的闪烁（打击）
     """
-   # TODO: 检测哨兵
-    x, y, w, h = roi
-    roi_img = frame[y:y+h, x:x+w]
-
-    hsv = cv2.cvtColor(roi_img, cv2.COLOR_BGR2HSV)
-    lower = np.array(hsv_range["lower"], dtype=np.uint8)
-    upper = np.array(hsv_range["upper"], dtype=np.uint8)
-
-    mask = cv2.inRange(hsv, lower, upper)
-    ratio = cv2.countNonZero(mask) / (w * h)
-
-    if debug:
-        cv2.imshow("ROI", roi_img)
-        cv2.imshow("Mask", mask)
-        cv2.waitKey(1)
-
-    return ratio <= thresh, ratio
+    if not mc or camera_name not in mc.workers:
+        print(f"错误: 未找到摄像头 '{camera_name}'")
+        return False
+    
+    # 检测参数
+    brightness_threshold = 150  # 亮度阈值（根据实际灯调整）
+    min_flash_count = flashes_per_sec  # 1秒内最少闪烁次数
+    flash_window = 1.0  # 闪烁检测时间窗口(秒)
+    
+    # 状态变量
+    flash_history = []  # 记录闪烁时间戳
+    last_brightness = None
+    start_time = time.time()
+    detection_timeout = flash_duration + 2.0  # 检测超时时间
+    
+    print(f"开始检测哨所打击，超时时间: {detection_timeout}秒")
+    
+    while time.time() - start_time < detection_timeout:
+        # 获取最新帧
+        frame_packet = mc.latest(camera_name)
+        if frame_packet is None:
+            time.sleep(0.01)
+            continue
+        
+        frame = frame_packet.image
+        
+        # 裁剪ROI区域
+        if roi:
+            x, y, w, h = roi
+            # 确保ROI在图像范围内
+            h, w_frame = frame.shape[:2]
+            x = max(0, min(x, w_frame - 1))
+            y = max(0, min(y, h - 1))
+            w = max(1, min(w, w_frame - x))
+            h = max(1, min(h, h - y))
+            region = frame[y:y+h, x:x+w]
+        else:
+            region = frame
+        
+        # 计算区域平均亮度
+        gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+        brightness = np.mean(gray)
+        current_time = time.time()
+        
+        # 检测亮度变化（闪烁）
+        if last_brightness is not None:
+            # 检测从亮到暗或从暗到亮的变化
+            bright_to_dark = (last_brightness > brightness_threshold and 
+                             brightness <= brightness_threshold)
+            dark_to_bright = (last_brightness <= brightness_threshold and 
+                             brightness > brightness_threshold)
+            
+            if bright_to_dark or dark_to_bright:
+                flash_history.append(current_time)
+                print(f"检测到闪烁变化: {bright_to_dark and '亮→暗' or '暗→亮'}, 时间: {current_time - start_time:.2f}s")
+        
+        last_brightness = brightness
+        
+        # 清理过期的闪烁记录
+        flash_history = [t for t in flash_history if current_time - t <= flash_duration]
+        
+        # 检查是否满足闪烁模式
+        if len(flash_history) >= min_flash_count * 2:  # 每次闪烁有亮暗两次变化
+            # 检查最近1秒内的闪烁次数
+            recent_flashes = [t for t in flash_history if current_time - t <= flash_window]
+            if len(recent_flashes) >= min_flash_count * 2:
+                print(f"检测到有效闪烁模式: {len(recent_flashes)//2}次闪烁/秒")
+                return True
+        
+        # 短暂延迟，避免过度占用CPU
+        time.sleep(0.01)
+    
+    print("检测超时，未发现有效闪烁模式")
+    return False
 
 def attack(target, link):
     # TODO: 不同目标位姿也不一样，可以考虑在函数外把位姿调整好？
     # 转速在函数里确认
     if target == 0:
         print("[INFO] 攻击哨兵")
-        link.send_shooter_rpm(1500)  # 设置转速
-        time.sleep(1.0)               # 等待转速稳定
-        link.shooter_fire()           # 触发发射
+        link.send_shooter_rpm(120)  # 设置转速
+        # time.sleep(1.0)               # 等待转速稳定
+        # link.shooter_fire()           # 触发发射
     elif target == 1:
         print("[INFO] 攻击大本营")
-        link.send_shooter_rpm(2000)  # 设置转速
-        time.sleep(1.0)               # 等待转速稳定
-        link.shooter_fire()           # 触发发射
-        
-import time
+        link.send_shooter_rpm(150)  # 设置转速
+        # time.sleep(1.0)               # 等待转速稳定
+        # link.shooter_fire()           # 触发发射
 
 def get_frames_burst(mc, cam_name, n=5, timeout_s=0.5, min_gap_ms=0):
     """
@@ -326,28 +450,69 @@ def get_frames_burst(mc, cam_name, n=5, timeout_s=0.5, min_gap_ms=0):
             time.sleep(0.01)
     return frames
 
-def get_dart(link, dart_id, mc, roi):
-    # TODO: 还需要判断dart是否成功抓取？
-    # 对于多次尝试抓取，可以试着每次加上偏移，但这样的话抓取飞镖就不是预设动作了，得和电控交流
-    # 目前的流程：只尝试一次抓取，失败直接跳过
+def _send_grab(link, dart_id, timeout_s=10.0):
+    w = _AckWaiter(link)
     if dart_id == 0:
-        print("[INFO] 抓取常规飞镖")
-        link.send_get_dart1()
-        frames = get_frames_burst(mc, "cam1", n=5, timeout_s=1.0, min_gap_ms=100)
-        if find_dart(frames, roi) == False:
-            return True
-        else:
-            print("[ERR] 常规飞镖抓取失败")
-            return False
+        link.arm_preset("0")
     elif dart_id == 1:
-        print("[INFO] 抓取战略飞镖")
-        link.send_get_dart2()
+        link.arm_preset("1")
+    ev = w.wait(timeout_s)
+    if ev is None:
+        return False, "timeout"
+    ok, fields = ev
+    return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
+
+def get_dart(link, dart_id, mc, roi, max_attempts=1):
+    """
+    抓取飞镖函数，支持多次尝试
+    
+    Args:
+        link: 通信链接对象
+        dart_id: 飞镖类型 (0-常规飞镖, 1-战略飞镖)
+        mc: 相机管理器对象
+        roi: 感兴趣区域
+        max_attempts: 最大尝试次数，默认为1次
+        
+    Returns:
+        bool: 抓取成功返回True，失败返回False
+    """
+    # TODO: link.send_get_dart1()函数待实现
+    # 对于多次尝试抓取，可以试着每次加上偏移，但这样的话抓取飞镖就不是预设动作了，得和电控交流
+    dart_names = {0: "常规飞镖", 1: "战略飞镖"}
+    dart_name = dart_names.get(dart_id, f"未知飞镖({dart_id})")
+    
+    for attempt in range(1, max_attempts + 1):
+        print(f"[INFO] 第{attempt}次尝试抓取{dart_name}")
+        
+        # 发送抓取指令
+        _send_grab(link, dart_id)
+        
+        # 获取图像帧并检测飞镖
         frames = get_frames_burst(mc, "cam1", n=5, timeout_s=1.0, min_gap_ms=100)
+        
+        # 检测飞镖是否还存在（不存在表示抓取成功）
         if find_dart(frames, roi) == False:
+            print(f"[SUCCESS] 第{attempt}次抓取{dart_name}成功")
             return True
         else:
-            print("[ERR] 战略飞镖抓取失败")
-            return False
+            print(f"[WARNING] 第{attempt}次抓取{dart_name}失败")
+            
+            # 如果不是最后一次尝试，可以添加一些延迟或调整策略
+            if attempt < max_attempts:
+                print(f"[INFO] 准备进行第{attempt+1}次尝试...")
+                # 这里可以添加一些重试前的延迟或其他操作
+                # time.sleep(0.5)  # 如果需要延迟
+    
+    print(f"[ERROR] 抓取{dart_name}失败，已尝试{max_attempts}次")
+    return False
+
+def start_heartbeat(link, interval=0.2):
+    def run():
+        while True:
+            link.heartbeat(interval_s=interval)
+            time.sleep(interval)
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
 
 def main():
     config_path = os.path.join(ROOT, "data", "config.json")
@@ -367,20 +532,19 @@ def main():
     # 3) 模块初始化
     det0 = Detector(
         camera_matrix=K0,
-        dist_coeffs=dist0,
         tag_size=cfg["tag_size"],
         hsv_params=cfg["hsv_range"]
     )
     det1 = Detector(
         camera_matrix=K1,
-        dist_coeffs=dist1,
         tag_size=cfg["tag_size"],
         hsv_params=cfg["hsv_range"]
     )
     car = RobotCar(tag_map)
     car.set_camera_extrinsic("cam0", T_robot_cam_0)
     car.set_camera_extrinsic("cam1", T_robot_cam_1)
-    link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"])
+    # link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"])
+    link = SerialLink(port="/dev/pts/5", baud=cfg["baud"])
     link.open()
     # start_heartbeat(link, interval=0.2) # 启动心跳线程
 
@@ -415,24 +579,60 @@ def main():
     # print("[INFO] 两路相机已就绪")
     # link._send_bytes(b'$T#')
     
-    link.send_vel_xy(500, 150)
-    time.sleep(1)
-    link.send_stop()
-    time.sleep(1)
-    link.query_encoders()
-    time.sleep(1)
-    link.send_shooter_rpm(1500)
-    time.sleep(1)
-    link.shooter_fire()
-    time.sleep(1)
-    link.arm_preset("GRAB")
-    time.sleep(1)
-    link.rotate(90)
-    time.sleep(1)
-    link.send_heartbeat()
-    print("测试旋转90度并等待ACK...")
-    res = _send_rot_and_wait_ack(link, 90, timeout_s=15.0)
-    print(res)
+    while True:
+        t = input(">>> ").strip().lower()  # 去除首尾空格并转换为小写
+        
+        if t in ("q", "quit", "exit", "esc"):
+            break
+        
+        # 处理两个数字的情况（XY移动）
+        elif len(t.split()) == 2 and all(part.lstrip('-').isdigit() for part in t.split()):
+            x, y = map(int, t.split())
+            link.send_vel_xy(x, y)
+        
+        # 处理旋转指令（R+数字）
+        elif t.startswith('r') and len(t) > 1 and t[1:].lstrip('-').isdigit():
+            num = int(t[1:])
+            link.rotate(num)
+        
+        # 处理发射器指令（T+数字）
+        elif t.startswith('t') and len(t) > 1 and t[1:].lstrip('-').isdigit():
+            num = int(t[1:])
+            link.send_shooter_rpm(num)
+        
+        # 处理G指令（预设动作）
+        elif t == 'g':
+            link.arm_preset("")
+        
+        else:
+            print("未知指令，请重新输入")
+        
+    #link.send_vel_xy(2000, 0)
+    # x 1600
+    #link.rotate(90)
+    #-3000
+    # link.send_stop()
+    # link.query_encoders()
+    # link.send_shooter_rpm(1500)
+    # link.shooter_fire()
+    # link.arm_preset("GRAB")
+    # link.rotate(-45)
+    # link.send_heartbeat()
+    # print("测试旋转90度并等待ACK...")
+    # res = _send_rot_and_wait_ack(link, 90, timeout_s=15.0)
+    # print(res)
+    
+    link.arm_preset("")
+    # link.send_shooter_rpm(130)
+    # go_to_ack_then_optional_tag_verify(
+    #     car, goal=(500, 500, 0), link=link,
+    #     pos_tol=50.0, yaw_tol=5.0,
+    #     move_timeout=6.0, rot_timeout=4.0,
+    #     verify_window=0.8, max_corrections=1,
+    #     scan_fn=None,
+    #     strategy="move_direct_then_rot"
+    # )
+    
     
 
 

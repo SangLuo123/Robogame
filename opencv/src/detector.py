@@ -44,8 +44,8 @@ class Detector:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
         
         # 2) 内参拆分
-        fx, fy = K_new[0, 0], K_new[1, 1]
-        cx, cy = K_new[0, 2], K_new[1, 2]
+        fx, fy = self.camera_matrix[0, 0], self.camera_matrix[1, 1]
+        cx, cy = self.camera_matrix[0, 2], self.camera_matrix[1, 2]
         
         # 3) 在无畸变图像上检测 tag
         results = self.tag_detector.detect(
@@ -55,6 +55,10 @@ class Detector:
             tag_size=self.tag_size
         )
 
+        # 确保 results 一定是 list
+        if not isinstance(results, list):
+            results = [results] if results is not None else []
+            
         # 4) 组装结果
         detections = []
         for r in results:
@@ -81,11 +85,12 @@ class Detector:
                     [ s,  s, 0],
                     [-s,  s, 0],
                 ], dtype=np.float64)
+                dist_coeffs = np.zeros((5, 1), dtype=np.float64)
 
                 img_pts_proj, _ = cv2.projectPoints(
                     obj_pts,
                     cv2.Rodrigues(R)[0],  # rvec
-                    t, K_new, None        # 无畸变参数
+                    t, self.camera_matrix, dist_coeffs        # 无畸变参数
                 )
                 img_pts_proj = img_pts_proj.reshape(-1, 2)
                 img_pts_obs = det["corners"]

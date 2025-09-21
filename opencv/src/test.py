@@ -25,28 +25,63 @@ def test_send():
             print("setDTR/RTS failed:", e)
 
         time.sleep(0.1)
-
-        # 发送一个简单的字节序列（修改为下位机期望的数据）
-        data = b'HELLO\n'   # 如果下位机期待二进制，请改为相应字节
-        print("Sending:", data)
-        ser.write(data)
-        ser.flush()
-        print("Flushed")
-
-        # 等待并尝试读取回包（如果下位机会回 ACK）
-        t0 = time.time()
-        resp = b''
-        while time.time() - t0 < 15:
+        
+        count = 1  # 发送计数器
+        last_send_time = time.time()  # 上次发送时间
+        
+        # 缓冲区用于累积接收的数据
+        receive_buffer = bytearray()
+        
+        print("开始运行，按 Ctrl+C 停止...")
+        
+        while True:
+            # 检查是否到达发送时间
+            current_time = time.time()
+            if current_time - last_send_time >= 5:
+                # 发送带计数器的消息
+                data = f"$HELLO{count}#".encode()
+                print(f"Sending ({count}): {data}")
+                ser.write(data)
+                ser.flush()
+                count += 1
+                last_send_time = current_time
+            
+            # 尝试读取接收到的数据
             chunk = ser.read(ser.in_waiting or 1)
             if chunk:
-                resp += chunk
-            else:
-                time.sleep(0.05)
-        print("Received:", resp)
-        ser.close()
+                receive_buffer.extend(chunk)
+                
+                # 检查缓冲区中是否有完整的消息（以#结尾）
+                if b'#' in receive_buffer:
+                    # 找到第一个#的位置
+                    hash_index = receive_buffer.find(b'#')
+                    if hash_index >= 0:
+                        # 提取完整消息（包括#）
+                        complete_message = receive_buffer[:hash_index + 1]
+                        print("Received complete message:", complete_message)
+                        
+                        # 移除已处理的消息
+                        receive_buffer = receive_buffer[hash_index + 1:]
+            
+            # 短暂休眠以避免CPU占用过高
+            time.sleep(0.01)
+            
+    except KeyboardInterrupt:
+        print("\n程序被用户中断")
     except Exception as e:
         print("Error:", e)
+    finally:
+        try:
+            ser.close()
+            print("串口已关闭")
+        except:
+            pass
 
 if __name__ == "__main__":
     list_ports()
     test_send()
+
+    """
+    $AOK#
+    $AERR#
+    """

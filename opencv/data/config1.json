@@ -2,7 +2,6 @@
     "serial_port": "/dev/ttyUSB0",
     "baud": 115200,
     "tag_size": 120,
-    "tag_size0": 50,
     "cameras": [
         {
             "id": "cam1",

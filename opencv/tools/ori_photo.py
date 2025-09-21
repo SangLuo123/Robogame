@@ -5,7 +5,7 @@ import os
 save_dir = "./img"
 os.makedirs(save_dir, exist_ok=True)
 
-camera = cv2.VideoCapture(2)
+camera = cv2.VideoCapture(2)  # 替换为你的摄像头设备路径
 if not camera.isOpened():
     print("无法打开摄像头")
     exit()

@@ -4,16 +4,17 @@ import time
 import threading
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict
+import numpy as np
 
 @dataclass # 能够自动生成一些基础方法
 class FramePacket:
     frame_id: int
     ts_ns: int            # monotonic time (ns)
-    image: "cv2.Mat"
+    image: np.ndarray  # BGR image
     fps: float            # 采集线程估算的FPS
 
 def _fourcc(code: str) -> int:
-    return cv2.VideoWriter_fourcc(*code)
+    return cv2.VideoWriter.fourcc(*code)
 
 class _CamWorker:
     """
@@ -66,6 +67,12 @@ class _CamWorker:
     # ------------- internal -------------
     def _open(self) -> bool:
         self._cap = cv2.VideoCapture(self.device, self.backend)
+        
+        if not self._cap or not self._cap.isOpened():
+            if self.name == "cam0":
+                self._cap = cv2.VideoCapture("/dev/video2", self.backend)
+                
+        
         if not self._cap or not self._cap.isOpened():
             return False
 
@@ -97,7 +104,8 @@ class _CamWorker:
                 if not self._open():
                     time.sleep(self.reopen_interval)
                     continue
-
+            if self._cap is None:
+                time.sleep(0.05); continue
             ok, img = self._cap.read()
             t_ns = time.monotonic_ns()
             if not ok or img is None:
@@ -111,6 +119,10 @@ class _CamWorker:
             if self.undistort_maps is not None:
                 mapx, mapy = self.undistort_maps
                 img = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
+                
+            # 旋转180度（如果相机名称匹配）
+            if self.name == "cam1":  # 替换为实际的相机名称
+                img = cv2.rotate(img, cv2.ROTATE_180)
 
             # FPS（EMA）
             if last_ts is not None:
@@ -138,7 +150,8 @@ class _CamWorker:
         """
         w, h = size
         newK, _ = cv2.getOptimalNewCameraMatrix(K, dist, (w, h), 0)
-        mapx, mapy = cv2.initUndistortRectifyMap(K, dist, None, newK, (w, h), cv2.CV_32FC1)
+        R = np.eye(3, dtype=np.float32)
+        mapx, mapy = cv2.initUndistortRectifyMap(K, dist, R, newK, (w, h), cv2.CV_32FC1)
         return mapx, mapy, newK
 
 

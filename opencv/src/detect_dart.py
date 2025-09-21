@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import os
 import sys
+import json
 """
 该代码根据传入的ROI自动分析飞镖的HSV范围并计算ROI中目标飞镖的面积占比决定是否有飞镖
 """
@@ -51,7 +52,8 @@ def calibrate_hsv_thresholds(frames, roi_rect=None, roi_poly=None,
             mask_roi = np.ones(crop.shape[:2], np.uint8) * 255
         else:
             mask_roi = np.zeros(img.shape[:2], np.uint8)
-            cv2.fillPoly(mask_roi, [np.int32(roi_poly)], 255)
+            pts = np.array(roi_poly, dtype=np.int32).reshape((-1,1,2))
+            cv2.fillPoly(mask_roi, [pts], 255)
             crop = cv2.bitwise_and(img, img, mask=mask_roi)
 
         # 高光掩膜并排除
@@ -115,9 +117,10 @@ def detect_dart_in_roi(frame_bgr, roi_rect=None, roi_poly=None, hsv_thr=None,
         roi_origin = (x, y)
     else:
         mask_roi = np.zeros(frame_bgr.shape[:2], np.uint8)
-        cv2.fillPoly(mask_roi, [np.int32(roi_poly)], 255)
+        pts = np.array(roi_poly, dtype=np.int32).reshape((-1,1,2))
+        cv2.fillPoly(mask_roi, [pts], 255)
         roi = cv2.bitwise_and(frame_bgr, frame_bgr, mask=mask_roi)
-        x,y,w,h = cv2.boundingRect(np.int32(roi_poly))
+        x,y,w,h = cv2.boundingRect(pts)
         roi = roi[y:y+h, x:x+w]
         mask_roi = mask_roi[y:y+h, x:x+w]
         roi_origin = (x, y)
@@ -152,11 +155,20 @@ def detect_dart_in_roi(frame_bgr, roi_rect=None, roi_poly=None, hsv_thr=None,
     if roi_rect:
         cv2.rectangle(overlay, (x,y), (x+w,y+h), (0,255,255), 2)
     else:
-        cv2.polylines(overlay, [np.int32(roi_poly)], True, (0,255,255), 2)
+        if roi_poly:
+            if not roi_poly or len(roi_poly) < 3:
+                raise ValueError("roi_poly 必须是非空的顶点列表，且至少包含 3 个点")
+            pts = np.array(roi_poly, dtype=np.int32).reshape(-1, 2)  # 转换为 (n, 2) 的数组
+            cv2.polylines(overlay, [pts], True, (0, 255, 255), 2)
     # 在原图上画 mask 轮廓
     contours,_ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        print("Warning: No contours found in mask")
+    if roi_origin is None:
+        raise ValueError("roi_origin 必须定义为 (x, y) 坐标")
+    roi_origin = np.array(roi_origin, dtype=np.int32).reshape(1, 1, 2)  # 转换为 (1, 1, 2)
     for c in contours:
-        c2 = c + np.array([[roi_origin]], dtype=c.dtype)
+        c2 = c + roi_origin  # 平移到原图坐标系
         cv2.polylines(overlay, [c2], True, (0,255,0), 2)
 
     out = dict(mask=mask, overlay=overlay, contours=contours, roi_origin=roi_origin)
@@ -170,17 +182,62 @@ def vote_presence(present_flags, need_true=3):
     """
     return sum(bool(x) for x in present_flags) >= int(need_true)
 
+# 保存阈值到 JSON
+def save_hsv_thresholds(hsv_thr, file_path):
+    """
+    将HSV阈值保存到JSON文件
+    
+    Args:
+        hsv_thr: 阈值字典 {H_min, H_max, S_min, V_min}
+        file_path: JSON文件保存路径
+    """
+    # 确保目录存在
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(hsv_thr, f, indent=4, ensure_ascii=False)
+    
+    print(f"HSV阈值已保存到: {file_path}")
+    
+# 读取阈值从 JSON
+def load_hsv_thresholds(file_path):
+    """
+    从JSON文件加载HSV阈值
+    
+    Args:
+        file_path: JSON文件路径
+        
+    Returns:
+        dict: HSV阈值字典
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"阈值文件不存在: {file_path}")
+    
+    with open(file_path, 'r', encoding='utf-8') as f:
+        hsv_thr = json.load(f)
+    
+    print(f"HSV阈值已从 {file_path} 加载")
+    return hsv_thr
+
 def find_dart(frames, roi):
+    # TODO: 传样片
     # 传多个frame
     # img_path = os.path.join(ROOT, "tools/img", "1.png")
-    # frames = [cv2.imread(img_path)]  # 你自己的样片列表
+    # fnames = [cv2.imread(img_path)]  # 你自己的样片列表
     # 假设你已经采集了几张样片 frames（BGR），并知道该孔的 ROI
     # roi = (332, 285, 94, 94)  # 或 roi_poly=[(x1,y1),...]
+    # file_path = os.path.join(ROOT, "data", "dart_hsv_thr.json")
+    
+
+    # hsv_thr, stats = calibrate_hsv_thresholds(fnames, roi_rect=roi)
+    # print("建议阈值:", hsv_thr, "样本范围(H/S/V):", stats)
+    # save_hsv_thresholds(hsv_thr, file_path)
+    # 把 hsv_thr 存成 JSON，比赛时直接读
 
     hsv_thr, stats = calibrate_hsv_thresholds(frames, roi_rect=roi)
     print("建议阈值:", hsv_thr, "样本范围(H/S/V):", stats)
-    # 把 hsv_thr 存成 JSON，比赛时直接读
-
+    
+    # loaded_hsv_thr = load_hsv_thresholds(file_path)
     present_flags = []
     for _ in range(5):  # 连续5帧投票
         frame = frames[0]  # 你自己的实时帧

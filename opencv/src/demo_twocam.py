@@ -30,8 +30,8 @@ def main():
     mc = MultiCam()
     # 先用较低分辨率验证链路更稳；OK 后再回到 1280x720
     backend = cv2.CAP_DSHOW  # Windows使用DirectShow后端 # linux上直接使用默认赋值即可
-    mc.add_camera("cam0", 0,   width=640, height=480, fourcc="MJPG", backend=backend)
-    mc.add_camera("cam1", 2, width=640, height=480, fourcc="MJPG", backend=backend)
+    mc.add_camera("cam0", "/dev/cam_up",   width=640, height=480, fourcc="MJPG", backend=backend)
+    mc.add_camera("cam1", "/dev/cam_down", width=640, height=480, fourcc="MJPG", backend=backend)
     mc.start()
 
     # 创建可缩放窗口，并设置初始大小
