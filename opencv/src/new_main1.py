@@ -1,3 +1,4 @@
+# src/main.py
 import os
 import sys
 import time
@@ -7,6 +8,7 @@ import numpy as np
 import cv2
 import threading
 from enum import Enum, auto
+import apriltag
 
 # --- 保证能导入 src/ 与 package/ ---
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -20,6 +22,7 @@ from src.load import load_calib, load_config
 from src.transform import build_T_robot_cam, build_tag_map
 from src.multicam import MultiCam, _CamWorker
 from src.detect_dart import find_dart
+from src.camera import Camera
 
 # ========== 任务状态机 ==========
 
@@ -28,10 +31,10 @@ class State(Enum):
     INITIAL_LOCATE = auto()
     GO_DART1 = auto()
     GO_DART2 = auto()
-    ATTACK = auto()
+    ATTACK1 = auto()
+    ATTACK2 = auto()
     DONE = auto()
     FAIL = auto()
-    GRAB = auto()
 
 # ========== 一些函数 ==========
 
@@ -145,14 +148,13 @@ def _world_vec_to_body(dx_w, dy_w, yaw_deg):
     dy_b = -s * dx_w + c * dy_w
     return dx_b, dy_b
 
-def _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=6.0):
+def _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=8.0):
     w = _AckWaiter(link)
     link.send_vel_xy(dx_b, dy_b)
     ev = w.wait(timeout_s)
     if ev is None:
         return False, "timeout"
     ok, fields = ev
-    print("ENC fields:", fields)
     return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
 
 def _send_rot_and_wait_ack(link, d_yaw, timeout_s=4.0):
@@ -162,7 +164,24 @@ def _send_rot_and_wait_ack(link, d_yaw, timeout_s=4.0):
     if ev is None:
         return False, "timeout"
     ok, fields = ev
-    print("ENC fields:", fields)
+    return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
+
+def _send_grab(link, dart, timeout_s=25.0):
+    w = _AckWaiter(link)
+    link.arm_preset(dart)
+    ev = w.wait(timeout_s)
+    if ev is None:
+        return False, "timeout"
+    ok, fields = ev
+    return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
+
+def _send_fire(link, rpm, timeout_s=8.0):
+    w = _AckWaiter(link)
+    link.send_shooter_rpm(rpm)
+    ev = w.wait(timeout_s)
+    if ev is None:
+        return False, "timeout"
+    ok, fields = ev
     return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
 
 def go_to_ack_then_optional_tag_verify(
@@ -231,20 +250,14 @@ def go_to_ack_then_optional_tag_verify(
 
         # === 根据 strategy 执行 ===
         if strategy == "rot_then_move_direct":
-            if abs(d_yaw) > 1.0:
-                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
-                if not ok: return {"ok": False, "stage": "rot", "info": info}
-            if abs(dx_b) <= 1.0:
-                dx_b = 0.0
-            if abs(dy_b) <= 1.0:
-                dy_b = 0.0
+            ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+            if not ok: return {"ok": False, "stage": "rot", "info": info}
             ok, info = _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=move_timeout)
             if not ok: return {"ok": False, "stage": "move", "info": info}
 
         elif strategy == "rot_then_move_x_then_y":
-            if abs(d_yaw) > 1.0:
-                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
-                if not ok: return {"ok": False, "stage": "rot", "info": info}
+            ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+            if not ok: return {"ok": False, "stage": "rot", "info": info}
             if abs(dx_b) > 1.0:
                 ok, info = _send_move_and_wait_ack(link, dx_b, 0, timeout_s=move_timeout)
                 if not ok: return {"ok": False, "stage": "move_x", "info": info}
@@ -253,9 +266,8 @@ def go_to_ack_then_optional_tag_verify(
                 if not ok: return {"ok": False, "stage": "move_y", "info": info}
 
         elif strategy == "rot_then_move_y_then_x":
-            if abs(d_yaw) > 1.0:
-                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
-                if not ok: return {"ok": False, "stage": "rot", "info": info}
+            ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+            if not ok: return {"ok": False, "stage": "rot", "info": info}
             if abs(dy_b) > 1.0:
                 ok, info = _send_move_and_wait_ack(link, 0, dy_b, timeout_s=move_timeout)
                 if not ok: return {"ok": False, "stage": "move_y", "info": info}
@@ -264,15 +276,10 @@ def go_to_ack_then_optional_tag_verify(
                 if not ok: return {"ok": False, "stage": "move_x", "info": info}
 
         elif strategy == "move_direct_then_rot":
-            if abs(dx_b) <= 1.0:
-                dx_b = 0.0
-            if abs(dy_b) <= 1.0:
-                dy_b = 0.0
             ok, info = _send_move_and_wait_ack(link, dx_b, dy_b, timeout_s=move_timeout)
             if not ok: return {"ok": False, "stage": "move", "info": info}
-            if abs(d_yaw) > 1.0:
-                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
-                if not ok: return {"ok": False, "stage": "rot", "info": info}
+            ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+            if not ok: return {"ok": False, "stage": "rot", "info": info}
 
         elif strategy == "move_x_then_y_then_rot":
             if abs(dx_b) > 1.0:
@@ -281,9 +288,8 @@ def go_to_ack_then_optional_tag_verify(
             if abs(dy_b) > 1.0:
                 ok, info = _send_move_and_wait_ack(link, 0, dy_b, timeout_s=move_timeout)
                 if not ok: return {"ok": False, "stage": "move_y", "info": info}
-            if abs(d_yaw) > 1.0:
-                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
-                if not ok: return {"ok": False, "stage": "rot", "info": info}
+            ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+            if not ok: return {"ok": False, "stage": "rot", "info": info}
 
         elif strategy == "move_y_then_x_then_rot":
             if abs(dy_b) > 1.0:
@@ -292,9 +298,8 @@ def go_to_ack_then_optional_tag_verify(
             if abs(dx_b) > 1.0:
                 ok, info = _send_move_and_wait_ack(link, dx_b, 0, timeout_s=move_timeout)
                 if not ok: return {"ok": False, "stage": "move_x", "info": info}
-            if abs(d_yaw) > 1.0:
-                ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
-                if not ok: return {"ok": False, "stage": "rot", "info": info}
+            ok, info = _send_rot_and_wait_ack(link, d_yaw, timeout_s=rot_timeout)
+            if not ok: return {"ok": False, "stage": "rot", "info": info}
 
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
@@ -407,7 +412,7 @@ def attack(target, link):
     # 转速在函数里确认
     if target == 0:
         print("[INFO] 攻击哨兵")
-        link.send_shooter_rpm(120)  # 设置转速
+        link.send_shooter_rpm(120)  # 设置转速以及触发发射
         # time.sleep(1.0)               # 等待转速稳定
         # link.shooter_fire()           # 触发发射
     elif target == 1:
@@ -449,18 +454,6 @@ def get_frames_burst(mc, cam_name, n=5, timeout_s=0.5, min_gap_ms=0):
         else:
             time.sleep(0.01)
     return frames
-
-def _send_grab(link, dart_id, timeout_s=10.0):
-    w = _AckWaiter(link)
-    if dart_id == 0:
-        link.arm_preset("0")
-    elif dart_id == 1:
-        link.arm_preset("1")
-    ev = w.wait(timeout_s)
-    if ev is None:
-        return False, "timeout"
-    ok, fields = ev
-    return (ok, "OK" if ok else ("ERR:" + ",".join(map(str, fields))))
 
 def get_dart(link, dart_id, mc, roi, max_attempts=1):
     """
@@ -514,15 +507,182 @@ def start_heartbeat(link, interval=0.2):
     t = threading.Thread(target=run, daemon=True)
     t.start()
 
+calibdown_path = os.path.join(ROOT, "calib", "calibdown.npz")
+camera_matrix, dist_coeffs = load_calib(calibdown_path)
+
+# 全局变量
+latest_result = None
+latest_frame = None
+detection_lock = threading.Lock()
+detection_running = False
+detection_thread = None
+
+def setup_apriltag_detector():
+    options = apriltag.DetectorOptions(families="tag36h11",
+                                      border=1,
+                                      nthreads=4,
+                                      quad_decimate=2.0,
+                                      quad_blur=0.8,
+                                      refine_edges=True,
+                                      refine_decode=True,
+                                      refine_pose=True,
+                                      debug=False,
+                                      quad_contours=True)
+    detector = apriltag.Detector(options)
+    return detector
+
+detector = setup_apriltag_detector()
+
+# 创建全局相机实例（确保只创建一个）
+camera_instance = None
+
+def get_camera():
+    """获取全局相机实例"""
+    global camera_instance
+    if camera_instance is None:
+        camera_instance = Camera("/dev/cam_down")
+        # 预先初始化相机
+        camera_instance.initialize()
+    return camera_instance
+
+def continuous_detection():
+    """持续检测线程函数"""
+    global latest_result, latest_frame, detection_running
+    
+    # 获取相机实例
+    cam = get_camera()
+    
+    while detection_running:
+        try:
+            # 使用锁确保线程安全地获取图像
+            with detection_lock:
+                img = cam.get_frame()
+            
+            if img is None:
+                time.sleep(0.01)
+                continue
+            
+            # 检测tag
+            result = detect_dart_in_frame(img)
+            
+            # 更新最新结果
+            with detection_lock:
+                latest_frame = img
+                latest_result = result
+            
+            time.sleep(0.033)  # 约30fps
+            
+        except Exception as e:
+            print(f"检测错误: {e}")
+            time.sleep(0.1)
+
+def start_continuous_detection():
+    """开始持续检测"""
+    global detection_running, detection_thread
+    
+    if detection_running:
+        return
+    
+    # 预先初始化相机
+    get_camera()
+    
+    detection_running = True
+    detection_thread = threading.Thread(target=continuous_detection, daemon=True)
+    detection_thread.start()
+    print("开始持续检测AprilTag")
+
+def stop_continuous_detection():
+    """停止持续检测"""
+    global detection_running, camera_instance
+    
+    detection_running = False
+    if detection_thread:
+        detection_thread.join(timeout=1.0)
+    
+    if camera_instance:
+        camera_instance.release()
+        camera_instance = None
+    print("停止持续检测")
+
+def detect_dart_in_frame(img):
+    """在指定帧中检测飞镖"""
+    # 直接转换为灰度图（不去畸变！）
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    # 检测AprilTag（在原始图像上检测）
+    results = detector.detect(gray)
+    
+    if not results:
+        return None
+    
+    # 获取第一个检测到的tag
+    tag = results[0]
+    corners = tag.corners.astype(np.float32)
+    
+    # tag尺寸
+    tag_size = 20.5  # 毫米
+    
+    # tag的3D角点坐标
+    object_points = np.array([
+        [-tag_size/2, -tag_size/2, 0],  # 左下
+        [tag_size/2, -tag_size/2, 0],   # 右下  
+        [tag_size/2, tag_size/2, 0],    # 右上
+        [-tag_size/2, tag_size/2, 0]    # 左上
+    ], dtype=np.float32)
+    
+    # 重要：直接使用畸变参数进行solvePnP
+    success, rvec, tvec = cv2.solvePnP(object_points, corners, camera_matrix, dist_coeffs)
+    
+    if not success:
+        return None
+    
+    return {
+        'rvec': rvec,
+        'tvec': tvec,
+        'tag_id': tag.tag_id,
+        'corners': corners
+    }
+
+def get_latest_detection():
+    """获取最新检测结果"""
+    with detection_lock:
+        return latest_result
+
+def get_latest_frame():
+    """获取最新帧"""
+    with detection_lock:
+        return latest_frame
+
+def detect_dart():
+    """兼容原有接口的检测函数"""
+    return get_latest_detection()
+
+def calculate_lateral_offset(tvec, target_offset_x=0):
+    """计算横向移动距离"""
+    if tvec is None:
+        raise ValueError("tvec is None")
+    
+    tvec_arr = np.asarray(tvec).reshape(-1)
+    if tvec_arr.size < 1:
+        raise ValueError("tvec shape unexpected: " + str(tvec.shape))
+
+    current_offset = float(tvec_arr[0])
+    movement_needed = current_offset - target_offset_x
+    
+    return movement_needed
+
+def cleanup():
+    """程序退出时清理资源"""
+    stop_continuous_detection()
+    cv2.destroyAllWindows()
+
 def main():
     config_path = os.path.join(ROOT, "data", "config.json")
     cfg = load_config(config_path)                     # 可换成 data/config.json
     calibup_path = os.path.join(ROOT, "calib", "calibup.npz")
-    calibdown_path = os.path.join(ROOT, "calib", "calibdown.npz")
 
     # 1) 相机标定参数
     K0, dist0 = load_calib(calibup_path)        # 你已有的函数，返回 (mtx, dist)
-    K1, dist1 = load_calib(calibdown_path)      # 你已有的函数，返回 (mtx, dist)
 
     # 2) 组装外参与地图
     T_robot_cam_0 = build_T_robot_cam(cfg["T_robot_cam_for"]["cam0"])
@@ -530,112 +690,214 @@ def main():
     tag_map = build_tag_map(cfg) # tag_map
 
     # 3) 模块初始化
-    det0 = Detector(
-        camera_matrix=K0,
-        tag_size=cfg["tag_size"],
-        hsv_params=cfg["hsv_range"]
-    )
-    det1 = Detector(
-        camera_matrix=K1,
-        tag_size=cfg["tag_size"],
-        hsv_params=cfg["hsv_range"]
-    )
-    car = RobotCar(tag_map)
-    car.set_camera_extrinsic("cam0", T_robot_cam_0)
-    car.set_camera_extrinsic("cam1", T_robot_cam_1)
+    # car = RobotCar(tag_map)
+    # car.set_camera_extrinsic("cam0", T_robot_cam_0)
+    # car.set_camera_extrinsic("cam1", T_robot_cam_1)
     link = SerialLink(port=cfg["serial_port"], baud=cfg["baud"])
-    # link = SerialLink(port="/dev/pts/5", baud=cfg["baud"])
     link.open()
     # start_heartbeat(link, interval=0.2) # 启动心跳线程
 
-    # # cap = open_camera(cfg["camera_index"])
-    # state = State.INIT
-    # goal = cfg["goal"]
+    # cap = open_camera(cfg["camera_index"])
+    goal = cfg["goal"]
 
-    # print("[INFO] 启动完成，进入主循环… 按 ESC 退出。")
+    print("[INFO] 启动完成，进入主循环… 按 ESC 退出。")
 
     # mc = MultiCam()
+    # w = 640
+    # h = 480
+    # print("[INFO] 读取相机标定参数完成, 值为：", K0, dist0, K1, dist1)
+    # mapx0, mapy0, newK0 = _CamWorker.build_undistort_maps(K0, dist0, (w, h))
+    # mapx1, mapy1, newK1 = _CamWorker.build_undistort_maps(K1, dist1, (w, h))
+    # print("[INFO] 畸变校正映射计算完成, 值为：", newK0, newK1)
     # backend = cv2.CAP_DSHOW  # Windows使用DirectShow后端 # linux上直接使用默认赋值即可
-    # mc.add_camera("cam0", 0,   width=640, height=480, fourcc="MJPG", backend=backend)
-    # mc.add_camera("cam1", 2, width=640, height=480, fourcc="MJPG", backend=backend)
+    # mc.add_camera("cam0", "/dev/cam_up", width=w, height=h, undistort_maps=(mapx0, mapy0, newK0), fourcc="MJPG")
+    # mc.add_camera("cam1", "/dev/cam_down", width=w, height=h, undistort_maps=(mapx1, mapy1, newK1), fourcc="MJPG")
     # mc.start()
-    
-    # # TODO: 数据待更新
-    # state = State.INIT_CHECKS
-    # dart1_pos = [1, 1, 1, 1, 1]
-    # dart2_pos = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    # shaobing = True
-    # scan_fn = lambda: get_tags(mc, det0, det1, car)
-    # dart1_roi = cfg["dart1_roi"] # TODO: 待更新
-    # dart2_roi = cfg["dart2_roi"] # TODO: 待更新
-    # dart1_num = 3
-    # dart2_num = 5
-    # attach_callbacks(link)
-    # led_roi = cfg["led_roi"]
-    # last_state = None # TODO: 待更新
-    # led_hsv_range = cfg["led_hsv_range"] # TODO: 待更新
-    
-    # wait_ready(mc, ["cam0", "cam1"], timeout_s=3.0)
-    # print("[INFO] 两路相机已就绪")
-    # link._send_bytes(b'$T#')
-    
-    while True:
-        t = input(">>> ").strip().lower()  # 去除首尾空格并转换为小写
-        
-        if t in ("q", "quit", "exit", "esc"):
-            break
-        
-        # 处理两个数字的情况（XY移动）
-        elif len(t.split()) == 2 and all(part.lstrip('-').isdigit() for part in t.split()):
-            x, y = map(int, t.split())
-            link.send_vel_xy(x, y)
-        
-        # 处理旋转指令（R+数字）
-        elif t.startswith('r') and len(t) > 1 and t[1:].lstrip('-').isdigit():
-            num = int(t[1:])
-            link.rotate(num)
-        
-        # 处理发射器指令（T+数字）
-        elif t.startswith('t') and len(t) > 1 and t[1:].lstrip('-').isdigit():
-            num = int(t[1:])
-            link.send_shooter_rpm(num)
-        
-        # 处理G指令（预设动作）
-        elif t == 'g':
-            link.arm_preset("")
-        
-        else:
-            print("未知指令，请重新输入")
-        
-    #link.send_vel_xy(2000, 0)
-    # x 1600
-    #link.rotate(90)
-    #-3000
-    # link.send_stop()
-    # link.query_encoders()
-    # link.send_shooter_rpm(1500)
-    # link.shooter_fire()
-    # link.arm_preset("GRAB")
-    # link.rotate(-45)
-    # link.send_heartbeat()
-    # print("测试旋转90度并等待ACK...")
-    # res = _send_rot_and_wait_ack(link, 90, timeout_s=15.0)
-    # print(res)
-    
-    # link.arm_preset("")
-    # link.send_shooter_rpm(130)
-    # go_to_ack_then_optional_tag_verify(
-    #     car, goal=(500, 500, 0), link=link,
-    #     pos_tol=50.0, yaw_tol=5.0,
-    #     move_timeout=6.0, rot_timeout=4.0,
-    #     verify_window=0.8, max_corrections=1,
-    #     scan_fn=None,
-    #     strategy="move_direct_then_rot"
+    # det0 = Detector(
+    #     camera_matrix=newK0,
+    #     tag_size=cfg["tag_size"],
+    #     hsv_params=cfg["hsv_range"]
+    # )
+    # det1 = Detector(
+    #     camera_matrix=newK1,
+    #     tag_size=cfg["tag_size"],
+    #     hsv_params=cfg["hsv_range"]
     # )
     
+    # TODO: 数据待更新
+    state = State.INIT_CHECKS
+    dart1_pos = [1, 1, 1, 1, 1]
+    dart2_pos = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    sb_hp = 2
+    # scan_fn = lambda: get_tags(mc, det0, det1, car)
+    dart1_roi = cfg["dart1_roi"] # TODO: 待更新
+    dart2_roi = cfg["dart2_roi"] # TODO: 待更新
+    dart1_num = 3
+    dart2_num = 5
+    attach_callbacks(link)
+    led_roi = cfg["led_roi"] # TODO: 待更新
+    last_state = State.INIT_CHECKS
     
+    start_continuous_detection()
+    while True:
+        # 每次移动后失败怎么处理？
+        if state == State.INIT_CHECKS:
+            # 初始阶段，检测各模块
+            # if camera.is_initialized == False:
+            #     camera.initialize()
+            print("[INFO] 相机已就绪")
+            last_state = state
+            state = State.INITIAL_LOCATE
 
+        elif state == State.INITIAL_LOCATE:
+            # ok, info = _send_rot_and_wait_ack(link, 90, timeout_s=4.0)
+            ok, info = _send_move_and_wait_ack(link, 1600, 0, timeout_s=6.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            time.sleep(1.0)
+            ok, info = _send_rot_and_wait_ack(link, 90, timeout_s=6.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
+            time.sleep(1.0)
+            ok, info = _send_move_and_wait_ack(link, 4000, 0, timeout_s=15.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            print("[INFO] 撞墙")
+            ok, info = _send_move_and_wait_ack(link, 0, -1000, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            ok, info = _send_move_and_wait_ack(link, 1000, 0, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            ok, info = _send_move_and_wait_ack(link, 0, 200, timeout_s=4.0)            
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            last_state = state
+            state = State.GO_DART1
+            
+                
+
+        elif state == State.GO_DART1:
+            dart_num = 1
+            DART_TAG_IDS = set(range(7, 15))
+            # ok, info = _send_move_and_wait_ack(link, 0, 230, timeout_s=4.0)
+            # if not ok:
+            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            for _ in range(dart_num): 
+                flag = False
+                while True:
+                    # time.sleep(1)
+                    result = detect_dart()
+                    if result is None:
+                        if flag == False:
+                            print("[ERR] 未检测到飞镖")
+                            # time.sleep(1)
+                            # TODO:横着走多少
+                            ok, info = _send_move_and_wait_ack(link, 0, 1, timeout_s=4.0)
+                            if not ok:
+                                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                            continue
+                        else:
+                            continue
+                    tvec = result['tvec']
+                    tag_id = result['tag_id']
+                    
+                    if tag_id not in DART_TAG_IDS:
+                        print(f"[INFO] 检测到非飞镖tag {tag_id}，跳过处理")
+                        # time.sleep(1)
+                        # TODO:横着走多少
+                        if flag == False:
+                            ok, info = _send_move_and_wait_ack(link, 0, 1, timeout_s=4.0)
+                            if not ok:
+                                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                        continue
+                    
+                    print(f"检测到tag {tag_id}, 位置: {tvec.flatten()}")
+                    flag = True
+                    
+                    # 计算移动量
+                    movement = calculate_lateral_offset(tvec, target_offset_x=-71)
+                    if abs(movement) < 4:
+                        print("[INFO] 飞镖已在目标位置，无需移动")
+                        break
+                    print(f"[INFO] 需要横向移动 {-movement:.1f} mm")
+                    if -movement > 0:
+                        ok, info = _send_move_and_wait_ack(link, 0, 1, timeout_s=4.0)
+                    else:
+                        ok, info = _send_move_and_wait_ack(link, 0, -1, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                time.sleep(2)
+                ok, info = _send_move_and_wait_ack(link, 150, 0, timeout_s=4.0)
+                if not ok:
+                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                ok, info = _send_grab(link, "", timeout_s=25.0)
+                if not ok:
+                    print(f"[ERR] 阶段 {state.name} 抓取失败: {info}")
+                tries = 3
+                while tries > 0:
+                    tries -= 1
+                    result = detect_dart()
+                    if result is None or result['tag_id'] not in DART_TAG_IDS:
+                        tries = 0
+                        continue
+                    ok, info = _send_grab(link, "", timeout_s=25.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 抓取失败: {info}")
+            last_state = state
+            state = State.ATTACK1
+
+        elif state == State.GO_DART2:
+            pass
+                
+
+        elif state == State.ATTACK1:
+            # TODO: 具体定位
+            # 后退
+            ok, info = _send_move_and_wait_ack(link, -100, 0, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            # 旋转
+            ok, info = _send_rot_and_wait_ack(link, 90, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
+            # # 后面撞墙
+            # ok, info = _send_move_and_wait_ack(link, 0, -1500, timeout_s=6.0)
+            # if not ok:
+            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            # # 右面撞墙
+            # ok, info = _send_move_and_wait_ack(link, -1000, 0, timeout_s=6.0)
+            # if not ok:
+            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            # 发射
+            fire_times = 1
+            for _ in range(fire_times):
+                ok, info = _send_fire(link, rpm=1200, timeout_s=8.0)
+                if not ok:
+                    print(f"[ERR] 阶段 {state.name} 发射失败: {info}")
+                time.sleep(1.0)
+            last_state = state
+            state = State.DONE
+        
+        elif state == State.ATTACK2:
+            pass
+        
+        elif state == State.DONE:
+            print("[INFO] 任务完成")
+            break
+
+        elif state == State.FAIL:
+            link.send_stop()
+            print("[ERR] 任务失败")
+            break
+        
+        link.heartbeat(interval_s=0.2)
+        print("[INFO] 上一个状态:", last_state.name, "当前状态:", state.name)
 
 # ====== 入口 ======
 if __name__ == "__main__":
     main()
+    cleanup()

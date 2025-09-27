@@ -5,7 +5,8 @@ import os
 save_dir = "./img"
 os.makedirs(save_dir, exist_ok=True)
 
-camera = cv2.VideoCapture(2)  # 替换为你的摄像头设备路径
+camera = cv2.VideoCapture(0)  # 替换为你的摄像头设备路径
+cam1 = cv2.VideoCapture(2)  # 替换为你的摄像头设备路径
 if not camera.isOpened():
     print("无法打开摄像头")
     exit()
@@ -15,12 +16,14 @@ print("按空格键拍摄图像，按 ESC 键退出程序")
 
 while True:
     ret, frame = camera.read()
+    ret1, frame1 = cam1.read()
     if not ret:
         print("无法读取图像")
         continue
 
     # 显示图像
     cv2.imshow("Live View", frame)
+    cv2.imshow("Live View1", frame1)
 
     key = cv2.waitKey(1) & 0xFF
     if key == 27:  # ESC 键

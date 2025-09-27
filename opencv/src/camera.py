@@ -37,7 +37,7 @@ class Camera:
             ret, frame = self.cap.read()
             if not ret:
                 raise RuntimeError("无法从摄像头获取图像")
-            frame = cv2.rotate(frame, cv2.ROTATE_180)  # 根据需要旋转图像
+            # frame = cv2.rotate(frame, cv2.ROTATE_180)  # 根据需要旋转图像
             return frame
     
     def release(self):
