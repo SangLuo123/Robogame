@@ -20,10 +20,9 @@ class AsciiProtocol:
       Q: $Q#                       (查询编码器)
       E: $E<e1>,<e2>,...#          (下位机回复)
       A: $AOK# / $AERR,<code>#     (下位机回复)
-      T: (下位机回复，保留)
-      F: (下位机回复，保留)
+      U: $U#                       (上楼)
+      D: $D#                       (下楼)
       T: $T<rpm>#                  (设置发射器转速)
-    #   T: $T#                       (触发发射)
       G: $G<name>#                 (机械臂预设动作)
       R: $R<yaw_deg>#              (旋转角度)
       H: $H#                       (心跳)
@@ -74,10 +73,6 @@ class AsciiProtocol:
     def build_shooter_rpm(rpm: int) -> bytes:
         return AsciiProtocol.build("T", [str(int(rpm))])
 
-    # @staticmethod
-    # def build_shooter_fire() -> bytes:
-    #     return AsciiProtocol.build("T")
-
     @staticmethod
     def build_arm_preset(name: str) -> bytes:
         return AsciiProtocol.build("G", [name])
@@ -86,6 +81,14 @@ class AsciiProtocol:
     def build_rotate(yaw_deg: float) -> bytes:
         # 默认逆时针？
         return AsciiProtocol.build("R", [f"{yaw_deg:.0f}"])
+
+    @staticmethod
+    def build_upstairs() -> bytes:
+        return AsciiProtocol.build("U")
+
+    @staticmethod
+    def build_downstairs() -> bytes:
+        return AsciiProtocol.build("D")
 
     @staticmethod
     def build_heartbeat() -> bytes:
@@ -237,9 +240,13 @@ class SerialLink:
         """设置发射器转速：$Trpm#"""
         self._send_bytes(self.proto.build_shooter_rpm(rpm))
 
-    # def shooter_fire(self):
-    #     """触发发射：$T#"""
-    #     self._send_bytes(self.proto.build_shooter_fire())
+    def send_upstairs(self):
+        """上楼：$U#"""
+        self._send_bytes(self.proto.build_upstairs())
+    
+    def send_downstairs(self):
+        """下楼：$D#"""
+        self._send_bytes(self.proto.build_downstairs())
 
     def arm_preset(self, name: str):
         """机械臂预设动作：$Gname#（如 GRAB/REL）"""

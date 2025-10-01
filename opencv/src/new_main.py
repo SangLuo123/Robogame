@@ -1,3 +1,7 @@
+"""
+三审代码，只抓常规飞镖和发射
+"""
+
 # src/main.py
 import os
 import sys
@@ -771,17 +775,14 @@ def main():
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
             if not ok:
-                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            ok, info = _send_move_and_wait_ack(link, 0, 200, timeout_s=4.0)            
-            if not ok:
-                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")            
             last_state = state
             state = State.GO_DART1
             
                 
 
         elif state == State.GO_DART1:
-            dart_num = 3
+            dart_num = 1
             DART_TAG_IDS = set(range(7, 15))
             # ok, info = _send_move_and_wait_ack(link, 0, 230, timeout_s=4.0)
             # if not ok:
@@ -855,7 +856,6 @@ def main():
                 
 
         elif state == State.ATTACK1:
-            # TODO: 具体定位
             # 后退
             ok, info = _send_move_and_wait_ack(link, -100, 0, timeout_s=4.0)
             if not ok:
@@ -873,7 +873,7 @@ def main():
             # if not ok:
             #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             # 发射
-            fire_times = 3
+            fire_times = 1
             for _ in range(fire_times):
                 ok, info = _send_fire(link, rpm=1200, timeout_s=8.0)
                 if not ok:

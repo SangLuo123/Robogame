@@ -44,7 +44,11 @@ opencv/
 | ├── main7.py              --只开一个相机，三审，拿全部常规
 | ├── main8.py              --只开一个相机，三审，新流程
 | ├── multicam.py           --多相机管理函数
+| ├── new_main1.py          --三审撞墙流程
+| ├── new_main2.py          --预赛撞墙流程（保下限）
 | ├── one_cam_tag.py        --一个相机测试主函数
+| ├── sim_main.py           --调用一个摄像头实时扫描tag
+| ├── sim_main2.py          --调用两个摄像头实时扫描tag
 | ├── simu_stm32.py         --模拟stm32进行通信
 | ├── test_main.py          --测试通信
 | ├── test.py               --测试通信
