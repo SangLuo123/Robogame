@@ -24,6 +24,7 @@ class AsciiProtocol:
       D: $D#                       (下楼)
       T: $T<rpm>#                  (设置发射器转速)
       G: $G<name>#                 (机械臂预设动作)
+      P: $P#                       (拿战略飞镖)
       R: $R<yaw_deg>#              (旋转角度)
       H: $H#                       (心跳)
     """
@@ -89,6 +90,10 @@ class AsciiProtocol:
     @staticmethod
     def build_downstairs() -> bytes:
         return AsciiProtocol.build("D")
+    
+    @staticmethod
+    def build_pick_dart() -> bytes:
+        return AsciiProtocol.build("P")
 
     @staticmethod
     def build_heartbeat() -> bytes:
@@ -247,6 +252,10 @@ class SerialLink:
     def send_downstairs(self):
         """下楼：$D#"""
         self._send_bytes(self.proto.build_downstairs())
+        
+    def pick_dart(self):
+        """拿战略飞镖：$P#"""
+        self._send_bytes(self.proto.build_pick_dart())
 
     def arm_preset(self, name: str):
         """机械臂预设动作：$Gname#（如 GRAB/REL）"""

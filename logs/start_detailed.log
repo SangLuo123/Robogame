@@ -1,0 +1,18 @@
+=== 启动脚本开始执行: Thu Oct  2 04:48:17 PM CST 2025 ===
+当前用户: root
+当前目录: /
+PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+等待系统启动...
+切换后目录: /home/orangepi/Robogame/opencv/src
+已加载.bashrc
+Python检查:
+/usr/bin/python3
+Python 3.10.12
+检查numpy...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'numpy'
+检查摄像头设备...
+lrwxrwxrwx 1 root root 6 Oct  2 16:48 /dev/cam_up -> video0
+开始执行主程序: Thu Oct  2 04:48:41 PM CST 2025
+程序退出: Thu Oct  2 04:48:41 PM CST 2025

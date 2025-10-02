@@ -1,0 +1,834 @@
+[INFO] 启动完成，进入主循环… 按 ESC 退出。
+读取配置: dart1_num=3, dart2_num=5
+当前参数: dart1_num=3, dart2_num=5
+开始摄像头1持续检测AprilTag, tag_size: 20.5mm
+开始摄像头2持续检测AprilTag, tag_size: 300mm
+[DEBUG] 发送: b'$V1600,09Z#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+相机初始化完成
+相机初始化完成
+ENC: OK
+[DEBUG] 发送: b'$R90\xc0\x8f#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[DEBUG] 发送: b'$V4000,0\xb7\xde#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[INFO] 撞墙 
+OK[DEBUG] 发送: b'$V0,-16008\xf8#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1000,0\xf4\xdf#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[INFO] 上一个状态: INITIAL_LOCATE 当前状态: GO_DART1
+[DEBUG] 发送: b'$V-150,0\xf3\xac#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ACK: OK
+ENC:[DEBUG] 发送: b'$V0,200O\x1a#' 
+OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[INFO] 准备抓取第 1 个常规飞镖
+[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True OK
+
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: [ERR] 未检测到飞镖OK
+
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True OK
+
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V200,0wr#'
+ OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK[DEBUG] 发送: b'$V1,0EQ#'
+
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#' OK
+
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: [DEBUG] 发送: b'$V1,0EQ#'
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK[DEBUG] 发送: b'$V200,0wr#'
+
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK: OK[DEBUG] 收到 ACK: True
+
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK: [DEBUG] 收到 ACK: TrueOK
+
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: [ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK: OK[DEBUG] 收到 ACK: True
+
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V200,0wr#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: [ERR] 未检测到飞镖
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: [ERR] 未检测到飞镖OK
+
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[DEBUG] 发送: b'$V200,0wr#'
+ACK: [DEBUG] 收到 ACK: TrueOK
+
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ENC: OK
+[DEBUG] 收到 ACK: True
+ACK: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ENC: OK
+[DEBUG] 收到 ACK: True
+ACK: OK
+ENC: OK
+[DEBUG] 发送: b'$V200,0wr#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[ERR] 未检测到飞镖 OK
+
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' OK
+
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: [ERR] 未检测到飞镖OK
+
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: [ERR] 未检测到飞镖
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: [ERR] 未检测到飞镖
+OK
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V200,0wr#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK[ERR] 未检测到飞镖
+
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[ERR] 未检测到飞镖
+ [DEBUG] 发送: b'$V0,70\x90\x11#'OK
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: TrueOK
+
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK: [DEBUG] 收到 ACK: TrueOK
+
+ENC: [DEBUG] 发送: b'$V200,0wr#'OK
+
+ACK:[DEBUG] 收到 ACK: True OK
+
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK: OK[DEBUG] 收到 ACK: True
+
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: [DEBUG] 发送: b'$V1,0EQ#'OK
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK: OK[DEBUG] 收到 ACK: True
+
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V200,0wr#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' OK
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: [DEBUG] 发送: b'$V200,0wr#'
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: [DEBUG] 发送: b'$V1,0EQ#'OK
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V200,0wr#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ENC: OK
+[DEBUG] 收到 ACK: True
+ACK: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ENC: OK
+[DEBUG] 收到 ACK: True
+ACK: OK
+[ERR] 未检测到飞镖ENC:
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+[DEBUG] 收到 ACK: True
+ACK: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ENC: OK
+[DEBUG] 收到 ACK: True
+ACK: OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V200,0wr#'
+ACK: OK
+[DEBUG] 收到 ACK: True
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+[DEBUG] 收到 ACK: True
+ACK: OK
+ENC: [ERR] 未检测到飞镖
+OK
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: [DEBUG] 发送: b'$V1,0EQ#'
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: TrueOK
+
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: [DEBUG] 发送: b'$V1,0EQ#'
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: [DEBUG] 发送: b'$V200,0wr#'
+OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK: OK[DEBUG] 收到 ACK: True
+
+ENC: [ERR] 未检测到飞镖
+OK
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' OK
+
+ACK: [DEBUG] 收到 ACK: TrueOK
+
+ENC:[DEBUG] 发送: b'$V200,0wr#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: [DEBUG] 发送: b'$V1,0EQ#'
+OK
+ACK: [DEBUG] 收到 ACK: TrueOK
+
+ENC: [ERR] 未检测到飞镖OK
+
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True OK
+
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: [DEBUG] 发送: b'$V1,0EQ#'OK
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[ERR] 未检测到飞镖 
+OK[DEBUG] 发送: b'$V0,70\x90\x11#'
+
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: [DEBUG] 发送: b'$V200,0wr#'
+OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: OK
+[DEBUG] 发送: b'$V-200,0\xa1;#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK[DEBUG] 发送: b'$V1,0EQ#'
+
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: [ERR] 未检测到飞镖OK
+
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK
+[DEBUG] 发送: b'$V1,0EQ#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: [ERR] 未检测到飞镖
+OK
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: [DEBUG] 发送: b'$V1,0EQ#'
+OK
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC: [ERR] 未检测到飞镖
+OK
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC: OK
+[ERR] 未检测到飞镖
+[DEBUG] 发送: b'$V0,70\x90\x11#'
+ACK:[DEBUG] 收到 ACK: True
+ OK
+ENC:[DEBUG] 发送: b'$V1,0EQ#'
+ OK
+ACK: [DEBUG] 收到 ACK: True
+OK
+ENC:[DEBUG] 发送: b'$V200,0wr#' 
+OK
+ACK:[DEBUG] 收到 ACK: True 
+OK
+ENC: OK

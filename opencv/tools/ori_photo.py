@@ -5,11 +5,14 @@ import os
 save_dir = "./img"
 os.makedirs(save_dir, exist_ok=True)
 
-camera = cv2.VideoCapture(0)  # 替换为你的摄像头设备路径
-cam1 = cv2.VideoCapture(2)  # 替换为你的摄像头设备路径
+camera = cv2.VideoCapture("/dev/cam_down")  # 替换为你的摄像头设备路径
+cam1 = cv2.VideoCapture("/dev/cam_up")  # 替换为你的摄像头设备路径
 if not camera.isOpened():
     print("无法打开摄像头")
     exit()
+    
+width = 480
+height = 320
 
 i = 1
 print("按空格键拍摄图像，按 ESC 键退出程序")
@@ -22,6 +25,9 @@ while True:
         continue
 
     # 显示图像
+    # frame = cv2.resize(frame, (width, height))
+    # frame1 = cv2.resize(frame1, (width, height))
+    
     cv2.imshow("Live View", frame)
     cv2.imshow("Live View1", frame1)
 

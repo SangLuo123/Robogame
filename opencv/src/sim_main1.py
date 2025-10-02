@@ -50,7 +50,6 @@ def setup_apriltag_detector():
     detector = apriltag.Detector(options)
     return detector
 
-detector = setup_apriltag_detector()
 
 # 创建全局相机实例
 camera_instance_cam1 = None
@@ -87,6 +86,8 @@ def continuous_detection(camera_id, tag_size):
     global latest_result_cam1, latest_frame_cam1, detection_running_cam1
     global latest_result_cam2, latest_frame_cam2, detection_running_cam2
     
+    
+    local_detector = setup_apriltag_detector()
     # 获取对应摄像头的内参和畸变参数
     camera_matrix, dist_coeffs = get_camera_params(camera_id)
     
@@ -108,7 +109,7 @@ def continuous_detection(camera_id, tag_size):
                 continue
             
             # 检测tag（传入摄像头参数）
-            result = detect_dart_in_frame(img, tag_size, camera_matrix, dist_coeffs)
+            result = detect_dart_in_frame(img, tag_size, camera_matrix, dist_coeffs, detector=local_detector)
             
             # 更新最新结果
             if camera_id == 1:
@@ -154,37 +155,52 @@ def start_continuous_detection(camera_id=1, tag_size=20.5):
         detection_thread_cam2.start()
         print(f"开始摄像头{camera_id}持续检测AprilTag, tag_size: {tag_size}mm")
 
-def stop_continuous_detection(camera_id=1):
-    """停止持续检测"""
-    global detection_running_cam1, camera_instance_cam1
-    global detection_running_cam2, camera_instance_cam2
-    
+def stop_continuous_detection(camera_id=1, wait_timeout=2.0):
+    """停止持续检测。等待线程退出后再释放 camera 实例。"""
+    global detection_running_cam1, camera_instance_cam1, detection_thread_cam1
+    global detection_running_cam2, camera_instance_cam2, detection_thread_cam2
+
     if camera_id == 1:
         detection_running_cam1 = False
+        # 等待线程结束（轮询 join）
         if detection_thread_cam1:
-            detection_thread_cam1.join(timeout=1.0)
-        
+            detection_thread_cam1.join(timeout=wait_timeout)
+            if detection_thread_cam1.is_alive():
+                print(f"警告: 摄像头{camera_id}检测线程未在 {wait_timeout}s 内退出")
+            detection_thread_cam1 = None
+
         if camera_instance_cam1:
-            camera_instance_cam1.release()
+            try:
+                camera_instance_cam1.release()
+            except Exception as e:
+                print(f"释放 camera1 时出错: {e}")
             camera_instance_cam1 = None
         print(f"停止摄像头{camera_id}持续检测")
     else:
         detection_running_cam2 = False
         if detection_thread_cam2:
-            detection_thread_cam2.join(timeout=1.0)
-        
+            detection_thread_cam2.join(timeout=wait_timeout)
+            if detection_thread_cam2.is_alive():
+                print(f"警告: 摄像头{camera_id}检测线程未在 {wait_timeout}s 内退出")
+            detection_thread_cam2 = None
+
         if camera_instance_cam2:
-            camera_instance_cam2.release()
+            try:
+                camera_instance_cam2.release()
+            except Exception as e:
+                print(f"释放 camera2 时出错: {e}")
             camera_instance_cam2 = None
         print(f"停止摄像头{camera_id}持续检测")
 
-def detect_dart_in_frame(img, tag_size, camera_matrix=None, dist_coeffs=None):
+def detect_dart_in_frame(img, tag_size, camera_matrix=None, dist_coeffs=None, detector=None):
     """在指定帧中检测飞镖"""
     # 如果没有传入相机参数，使用默认的第一个摄像头参数（保持向后兼容）
     if camera_matrix is None:
         camera_matrix = camera_matrix1
     if dist_coeffs is None:
         dist_coeffs = dist_coeffs1
+    if detector is None:
+        detector = setup_apriltag_detector()
     
     # 直接转换为灰度图（不去畸变！）
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

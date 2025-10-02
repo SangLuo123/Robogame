@@ -245,7 +245,7 @@ camera_instance_cam2 = None
 def get_camera(camera_id):
     """获取全局相机实例"""
     global camera_instance_cam1, camera_instance_cam2
-    # TODO: 若飞镖索引有问题，在此调换
+    
     if camera_id == 1:
         if camera_instance_cam1 is None:
             camera_instance_cam1 = Camera("/dev/cam_down")
@@ -553,12 +553,13 @@ def main():
                 ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
                 if not ok:
                     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                time.sleep(0.5)
                 if flag1 == False:
                     ok, info = _send_move_and_wait_ack(link, 0, 200, timeout_s=4.0)
                     if not ok:
                         print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
                     flag1 = True
-                time.sleep(0.5)
+                    time.sleep(2.0)
                 while True:
                     # time.sleep(1)
                     result = detect_dart(1)
@@ -845,7 +846,7 @@ def main():
                     print(f"[ERR] 阶段 {state.name} 发射失败: {info}")
                 time.sleep(2.0)
             last_state = state
-            state = State.GO_DART2
+            state = State.DONE
         
         elif state == State.ATTACK2:
             DART_TAG_IDS = set(range(5, 7))

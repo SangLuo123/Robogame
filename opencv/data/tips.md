@@ -150,3 +150,8 @@ socat -d -d pty,raw,echo=0 pty,raw,echo=0
 (2064, 4531, 88.8)
 
 坐标：sim_main里x朝相机右边，y朝相机下边，z朝相机前边
+
+
+ps -ef | grep new_main4.py
+sudo kill 3041
+sudo kill -9 3041

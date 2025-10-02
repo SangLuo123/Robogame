@@ -1,0 +1,8 @@
+=== 飞镖检测程序启动: Fri Oct  3 03:41:30 AM CST 2025 ===
+当前目录: /home/orangepi/Robogame/opencv/src
+检查Python环境...
+Python 3.10.12
+sys.path= ['', '/home/orangepi/.local/lib/python3.10/site-packages', '/home/orangepi/Robogame/opencv/src', '/usr/lib/python310.zip', '/usr/lib/python3.10', '/usr/lib/python3.10/lib-dynload', '/usr/local/lib/python3.10/dist-packages', '/usr/lib/python3/dist-packages']
+numpy检查通过
+开始执行主程序: Fri Oct  3 03:41:56 AM CST 2025
+程序退出: Fri Oct  3 03:44:36 AM CST 2025

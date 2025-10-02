@@ -1,2 +1,2 @@
-3
-5
+dart1_num: 3
+dart2_num: 5
