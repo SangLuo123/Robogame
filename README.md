@@ -1,6 +1,6 @@
 # Robogame2025
 This project is used for USTC Robogame2025.
-文件结构暂未更新...
+若要参考我的代码，请先看`Robogame比赛总结.md`
 ## Files
 ```
 流程/
@@ -67,5 +67,5 @@ main.sh                     --直接启动的脚本，留给电控用的
 program_output.log          --自启动程序的输出日志
 start.log                   --自启动脚本的输出日志
 start.sh                    --自启动脚本
-总结.md                      --比赛总结
+Robogame比赛总结.md          --比赛总结
 ```
