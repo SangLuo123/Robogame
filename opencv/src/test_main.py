@@ -578,6 +578,7 @@ def main():
     # wait_ready(mc, ["cam0", "cam1"], timeout_s=3.0)
     # print("[INFO] 两路相机已就绪")
     # link._send_bytes(b'$T#')
+    # link.send_shooter_rpm(140.5)
     
     while True:
         t = input(">>> ").strip().lower()  # 去除首尾空格并转换为小写
@@ -599,6 +600,9 @@ def main():
         elif t.startswith('t') and len(t) > 1 and t[1:].lstrip('-').isdigit():
             num = int(t[1:])
             link.send_shooter_rpm(num)
+            
+        elif t == 'u':
+            link.send_upstairs()
         
         # 处理G指令（预设动作）
         elif t == 'g':

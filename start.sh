@@ -25,7 +25,7 @@ echo "检查Python环境..." >> /home/orangepi/Robogame/start.log
 
 # 执行主程序 - 使用绝对路径
 echo "开始执行主程序: $(date)" >> /home/orangepi/Robogame/start.log
-/usr/bin/python3 -u new_main4.py >> /home/orangepi/Robogame/program_output.log 2>/dev/null
+/usr/bin/python3 -u new_main7.py >> /home/orangepi/Robogame/program_output.log 2>/dev/null
 
 
 

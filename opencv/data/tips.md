@@ -155,3 +155,6 @@ socat -d -d pty,raw,echo=0 pty,raw,echo=0
 ps -ef | grep new_main4.py
 sudo kill 3041
 sudo kill -9 3041
+
+new_main7.py 发射自己家
+new_main4.py 正常发射

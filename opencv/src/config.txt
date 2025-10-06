@@ -1,2 +1,2 @@
-dart1_num: 3
+dart1_num: 1
 dart2_num: 5

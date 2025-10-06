@@ -245,7 +245,7 @@ camera_instance_cam2 = None
 def get_camera(camera_id):
     """获取全局相机实例"""
     global camera_instance_cam1, camera_instance_cam2
-    
+    # TODO: 索引有问题就修改这里
     if camera_id == 1:
         if camera_instance_cam1 is None:
             camera_instance_cam1 = Camera("/dev/cam_down")
@@ -481,6 +481,8 @@ def main():
     
     read_config()  # 启动时读取配置文件
     print(f'当前参数: dart1_num={dart1_num}, dart2_num={dart2_num}')
+    dart1_num = 3
+    dart2_num = 5
     attach_callbacks(link)
     recover_flag = False
     if dart1_num > 0:
@@ -499,8 +501,6 @@ def main():
     # TODO: 注意id1要映射到扫飞镖的摄像头，id2要映射到扫环境tag的摄像头
     start_continuous_detection(camera_id=1, tag_size=20.5)
     start_continuous_detection(camera_id=2, tag_size=300)
-    
-    return
     while True:
         # 每次移动后失败怎么处理？
         if state == State.INIT_CHECKS:
@@ -512,24 +512,25 @@ def main():
             state = State.INITIAL_LOCATE
 
         elif state == State.INITIAL_LOCATE:
-            # ok, info = _send_move_and_wait_ack(link, 1600, 0, timeout_s=6.0)
-            # if not ok:
-            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            # time.sleep(1.0)
-            # ok, info = _send_rot_and_wait_ack(link, 90, timeout_s=6.0)
-            # if not ok:
-            #     print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
-            # time.sleep(1.0)
-            # ok, info = _send_move_and_wait_ack(link, 4000, 0, timeout_s=15.0)
-            # if not ok:
-            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            # print("[INFO] 撞墙")
-            # ok, info = _send_move_and_wait_ack(link, 0, -1000, timeout_s=4.0)
-            # if not ok:
-            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            # ok, info = _send_move_and_wait_ack(link, 1000, 0, timeout_s=4.0)
-            # if not ok:
-            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            ok, info = _send_move_and_wait_ack(link, 1600, 0, timeout_s=6.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            time.sleep(1.0)
+            ok, info = _send_rot_and_wait_ack(link, 84, timeout_s=6.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
+            time.sleep(2.0)
+            ok, info = _send_move_and_wait_ack(link, 4000, 0, timeout_s=15.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            print("[INFO] 撞墙")
+            ok, info = _send_move_and_wait_ack(link, 0, -1400, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            ok, info = _send_move_and_wait_ack(link, 1000, 0, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            # ---------------------------下面不需要
             # ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
             # if not ok:
             #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
@@ -546,20 +547,23 @@ def main():
                 
 
         elif state == State.GO_DART1:
-            # ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
-            # if not ok:
-            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            # ok, info = _send_move_and_wait_ack(link, 0, 200, timeout_s=4.0)
-            # if not ok:
-            #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            # TODO: DART_TAG_IDS 得修改
-            # TODO: 若没抓到怎么办？异常处理？但未能实现继承状态
-            # TODO: dart1_num需要能够从配置文件读取
+            ok, info = _send_move_and_wait_ack(link, -200, 0, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            ok, info = _send_move_and_wait_ack(link, 0, 100, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+            ok, info = _send_move_and_wait_ack(link, 1, 0, timeout_s=4.0)
+            if not ok:
+                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             DART_TAG_IDS = {247, 248, 268, 270, 282, 297, 367, 509}
-            flag1 = False
+            # flag1 = False
             fire_dart1 = dart1_num
             grabed = 0
-            for _ in range(dart1_num):
+            first_fire = False
+            for times in range(dart1_num):
+                ret = 0
+                print(f"[INFO] 准备抓取第 {times+1} 个常规飞镖")
                 # # 后退
                 # ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
                 # if not ok:
@@ -571,42 +575,73 @@ def main():
                 #         print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
                 #     flag1 = True
                 #     time.sleep(2.0)
-                ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                # ----------------------------------
+                # ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
+                # if not ok:
+                #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
                 flag_de = False
-                dist = 150 + grabed * 150
-                ok, info = _send_move_and_wait_ack(link, 0, dist, timeout_s=4.0)            
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                ok, info = _send_move_and_wait_ack(link, 1, 0, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                move_num = 0
+                is_detected = False
+                # first_fire = False
+                # dist = 150 + grabed * 150
+                # ok, info = _send_move_and_wait_ack(link, 0, dist, timeout_s=4.0)            
+                # if not ok:
+                #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                # ok, info = _send_move_and_wait_ack(link, 1, 0, timeout_s=4.0)
+                # if not ok:
+                #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
                 while True:
                     # time.sleep(1)
                     result = detect_dart(1)
+                    if ret > 15:
+                        is_detected = False
+                        print("[WARN] 飞镖丢失，全部重新开始")
                     if result is None or result['tag_id'] not in DART_TAG_IDS:
+                        if is_detected:
+                            ret += 1
+                            print("[WARN] 飞镖丢失，重新检测")
+                            ok, info = _send_move_and_wait_ack(link, 0, -1, timeout_s=4.0)
+                            if not ok:
+                                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                            continue
                         print("[ERR] 未检测到飞镖")
                         # time.sleep(1)
-                        ok, info = _send_move_and_wait_ack(link, 0, 1, timeout_s=4.0)
+                        ok, info = _send_move_and_wait_ack(link, 0, 70, timeout_s=4.0)
                         if not ok:
                             print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                        ok, info = _send_move_and_wait_ack(link, 1, 0, timeout_s=4.0)
+                        if not ok:
+                            print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                        move_num += 1
+                        if move_num >= 5:
+                            # 重新标定
+                            ok, info = _send_move_and_wait_ack(link, 200, 0, timeout_s=4.0)
+                            if not ok:
+                                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                            time.sleep(0.5)
+                            ok, info = _send_move_and_wait_ack(link, -200, 0, timeout_s=4.0)
+                            if not ok:
+                                print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                            move_num = 0
                         continue
+                    ret = 0
                     tvec = result['tvec']
                     tag_id = result['tag_id']
+                    move_num = 0
+                    is_detected = True
                     
                     print(f"检测到tag {tag_id}, 位置: {tvec.flatten()}")
 
                     
                     # 计算移动量
-                    movement = calculate_lateral_offset(tvec, target_offset_x=-71)
-                    if abs(movement) < 4:
+                    movement = calculate_lateral_offset(tvec, target_offset_x=-67)
+                    if abs(movement) < 2:
                         if flag_de == False:
                             flag_de = True
-                            ok, info = _send_move_and_wait_ack(link, 250, 0, timeout_s=4.0)
+                            ok, info = _send_move_and_wait_ack(link, 400, 0, timeout_s=4.0)
                             if not ok:
                                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                            ok, info = _send_move_and_wait_ack(link, -140, 0, timeout_s=4.0)
+                            ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
                             if not ok:
                                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
                             continue
@@ -623,11 +658,11 @@ def main():
                 ok, info = _send_move_and_wait_ack(link, 200, 0, timeout_s=4.0)
                 if not ok:
                     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                ok, info = _send_move_and_wait_ack(link, -140, 0, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                tries = 3 # 最多试三次
-                ok, info = _send_grab(link, "", timeout_s=25.0)
+                # ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
+                # if not ok:
+                #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                tries = 2 # 最多试两次
+                ok, info = _send_grab(link, "", timeout_s=27.0)
                 if not ok:
                     print(f"[ERR] 阶段 {state.name} 抓取失败: {info}")
                 tries -= 1
@@ -640,64 +675,117 @@ def main():
                     ok, info = _send_move_and_wait_ack(link, 85, 0, timeout_s=4.0)
                     if not ok:
                         print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                    ok, info = _send_grab(link, "", timeout_s=25.0)
+                    ok, info = _send_grab(link, "", timeout_s=27.0)
                     if not ok:
                         print(f"[ERR] 阶段 {state.name} 抓取失败: {info}")
                 grabed += 1
                 dart1_num -= 1
-                update_parameters(dart1_num, dart2_num)
+                # update_parameters(dart1_num, dart2_num)
                 # 发射
                 print("[INFO] 准备发射")
-                ok, info = _send_move_and_wait_ack(link, -100, 0, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(0.5)
-                ok, info = _send_rot_and_wait_ack(link, 90, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
-                time.sleep(0.5)
-                ok, info = _send_move_and_wait_ack(link, 0, -500, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(0.5)
-                ok, info = _send_move_and_wait_ack(link, 500, 0, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(0.5)
-                print("[INFO] 发射")
-                ok, info = _send_fire(link, 145, timeout_s=8.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 发射失败: {info}")
-                # 回到墙角
-                time.sleep(0.5)
-                ok, info = _send_move_and_wait_ack(link, -300, 0, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(0.5)
-                ok, info = _send_move_and_wait_ack(link, 0, 300, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(0.5)
-                ok, info = _send_rot_and_wait_ack(link, -90, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
-                time.sleep(1.0)
-                ok, info = _send_move_and_wait_ack(link, 0, -1000, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(0.5)
-                ok, info = _send_move_and_wait_ack(link, 400, 0, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(0.5)
-                ok, info = _send_move_and_wait_ack(link, 0, -500, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(0.5)
-                ok, info = _send_move_and_wait_ack(link, 200, 0, timeout_s=4.0)
-                if not ok:
-                    print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-                time.sleep(1.0)
+                # ok, info = _send_move_and_wait_ack(link, -100, 0, timeout_s=4.0)
+                # if not ok:
+                #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                # time.sleep(1.0)
+                # ok, info = _send_rot_and_wait_ack(link, 90, timeout_s=4.0)
+                # if not ok:
+                #     print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
+                # time.sleep(2.0)
+                if first_fire == False:
+                    ok, info = _send_fire(link, 125, timeout_s=1.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 发射失败: {info}")
+                    first_fire = True
+                    time.sleep(1.0)
+                    ok, info = _send_move_and_wait_ack(link, 1, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(1.0)
+                    ok, info = _send_fire(link, 125, timeout_s=6.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 发射失败: {info}")
+                    time.sleep(1.0)
+                    ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(1.0)
+                else:
+                    ok, info = _send_move_and_wait_ack(link, -200, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(1.0)
+                    ok, info = _send_rot_and_wait_ack(link, 90, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
+                    time.sleep(2.0)
+                    # TODO: 撞墙发射
+                    ok, info = _send_move_and_wait_ack(link, 0, -600, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(0.5)
+                    ok, info = _send_move_and_wait_ack(link, 1200, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(0.5)
+                    print("[INFO] 发射")
+                    ok, info = _send_fire(link, 140, timeout_s=8.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 发射失败: {info}")
+                    # 回到墙角
+                    time.sleep(0.5)
+                    ok, info = _send_move_and_wait_ack(link, -300, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(0.5)
+                    ok, info = _send_move_and_wait_ack(link, 0, 300, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(0.5)
+                    ok, info = _send_rot_and_wait_ack(link, -90, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
+                    time.sleep(2.0)
+                    ok, info = _send_move_and_wait_ack(link, 1, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(0.5)
+                    ok, info = _send_move_and_wait_ack(link, 0, -1600, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(0.5)
+                    # 1
+                    # ok, info = _send_move_and_wait_ack(link, -300, 0, timeout_s=4.0)
+                    # if not ok:
+                    #     print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    # time.sleep(0.5)
+                    # ok, info = _send_rot_and_wait_ack(link, 90, timeout_s=4.0)
+                    # if not ok:
+                    #     print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
+                    # time.sleep(0.5)
+                    # 2
+                    ok, info = _send_move_and_wait_ack(link, 1000, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(0.5)
+                    ok, info = _send_move_and_wait_ack(link, 0, -400, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(0.5)
+                    ok, info = _send_move_and_wait_ack(link, 200, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    time.sleep(1.0)
+                    ok, info = _send_move_and_wait_ack(link, -150, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    # flag_de = False
+                    dist = 200 + grabed * 150
+                    ok, info = _send_move_and_wait_ack(link, 0, dist, timeout_s=4.0)            
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
+                    ok, info = _send_move_and_wait_ack(link, 1, 0, timeout_s=4.0)
+                    if not ok:
+                        print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             print("[INFO] 战术飞镖发射完成")
             last_state = state
             state = State.DONE
@@ -706,10 +794,10 @@ def main():
             """
             得先转180度
             """
-            ok, info = _send_move_and_wait_ack(link, 0, 200, timeout_s=4.0)
+            ok, info = _send_move_and_wait_ack(link, 0, 300, timeout_s=4.0)
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            ok, info = _send_move_and_wait_ack(link, -200, 0, timeout_s=4.0)
+            ok, info = _send_move_and_wait_ack(link, -300, 0, timeout_s=4.0)
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             ok, info = _send_rot_and_wait_ack(link, 180, timeout_s=4.0)
@@ -717,7 +805,7 @@ def main():
                 print(f"[ERR] 阶段 {state.name} 旋转失败: {info}")
             print("[INFO] 准备上台阶")
             # 上楼梯前得先贴墙，直接往前贴可行？如果不准还是得再侧着贴另一边
-            ok, info = _send_move_and_wait_ack(link, 1000, 0, timeout_s=6.0)
+            ok, info = _send_move_and_wait_ack(link, 2000, 0, timeout_s=6.0)
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             ok, info = _send_move_and_wait_ack(link, 0, 400, timeout_s=6.0)
@@ -727,7 +815,7 @@ def main():
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 上楼梯失败: {info}")
             print("[INFO] 上楼梯完成，撞墙")
-            ok, info = _send_move_and_wait_ack(link, 0, 1000, timeout_s=6.0)
+            ok, info = _send_move_and_wait_ack(link, 0, 2000, timeout_s=6.0)
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             ok, info = _send_move_and_wait_ack(link, 400, 0, timeout_s=6.0)
@@ -751,8 +839,7 @@ def main():
             """
             DART_TAG_IDS = {247, 248, 268, 270, 282, 297, 367, 509}
             if recover_flag == False:
-            # TODO: dart2_num需要能够从配置文件读取
-            # TODO: DART_TAG_IDS 得修改
+
             
             # range_num = min(box_num, dart2_num)
             # dart2_grab = range_num
@@ -1011,7 +1098,7 @@ def main():
             ok, info = _send_move_and_wait_ack(link, 0, -2000, timeout_s=8.0)
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            ok, info = _send_move_and_wait_ack(link, 300, 0, timeout_s=6.0)
+            ok, info = _send_move_and_wait_ack(link, 290, 0, timeout_s=6.0)
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             DART2_lr = 1
@@ -1132,7 +1219,7 @@ def main():
             ok, info = _send_move_and_wait_ack(link, 0, 300, timeout_s=6.0)
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
-            ok, info = _send_move_and_wait_ack(link, 300, 0, timeout_s=6.0)
+            ok, info = _send_move_and_wait_ack(link, 290, 0, timeout_s=6.0)
             if not ok:
                 print(f"[ERR] 阶段 {state.name} 移动失败: {info}")
             # 上台阶
